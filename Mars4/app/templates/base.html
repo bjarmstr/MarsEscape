@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+	
+      <title>{{colonyName}} Escape Room {{title}}</title>
+      <link rel="icon" type="image/png" href="/static/images/favicon-32x32.png" sizes="32x32" />
+      
+      <link rel="stylesheet" href="/static/css/main_style.css">
+      
+	  {% block more_css%}
+	  {% endblock %}
+	  
+	  	
+</head>
+
+  <body >
+  
+    <header>
+		<h1>{{colonyName}} Escape Room</h1>
+ 		
+		
+	</header>
+
+	 
+	 
+	<div class="main-container">
+	{% if active_page == "piping" or active_page == "operations"%}
+	<nav>
+ 			<ul id="tabs">
+			<li class="first"><a {% if active_page == "piping"%}class="active_pg"{%endif%} href="/piping">Piping</a></li>
+			<li><a {% if active_page == "operations"%}class="active_pg"{%endif%} href="/operations">Operations</a></li>
+			</ul>
+ 	</nav>
+ 	 {% endif %}
+	<main id="content" class="content">
+	
+	<!-- flash messages for form sanitizing -->
+		{% with messages = get_flashed_messages() %}
+		  {% if messages %}
+		  	<ul class="error">
+			    {% for message in messages %}
+			      <li>{{ message }}</li>
+			    {% endfor %}
+			</ul>
+		  {% endif %}
+		{% endwith %}
+		  
+	<!-- main content here -->	  
+	        {% block content %}{% endblock %}
+	 </main>
+	 </div>
+	 
+	<div class="footer-container">
+	<footer>
+	<p><a href="https://docs.google.com/document/d/1P1bUVdSZ6x7BuFsth0778dTV5i4LvhSmr4lbIhTOcec/edit">Mars Escape Room Design Documentation</a></a></p>
+	<p>Created by Jean Armstrong 2021</p>
+	</footer>
+	</div>
+	
+  </body>
+</html>

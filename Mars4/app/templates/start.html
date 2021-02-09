@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<title>Escape Room Timer Setup</title>
+</head>
+<body>
+
+	<h1>Scenarios</h1>
+	<form action="/start.html">
+	{% for item in scenarios %}
+<tr>
+    <td>{{item}} <input type="checkbox" id="item" name="item" value="item"></td>
+
+</tr>
+
+	{% endfor %}
+<input type="submit" value="Submit">
+</form>
+</body>
+
+</body>
+</html>

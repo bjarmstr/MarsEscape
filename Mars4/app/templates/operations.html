@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+{% set active_page = "operations" %}
+{% extends "base.html" %}
+
+{% block more_css %}
+<link rel="stylesheet" href="/static/css/clock_on.css">
+{% endblock %}
+
+{% block content %}
+    <h1>Assembly Rates and Tank Levels</h1>
+    
+    <form action="#" method="post">
+    
+    <ul>
+    <h3>Process Rate</h3>
+      <li><input type="text" name="CDRA_rate" />CDRA</li>
+ 	  <li><input type="text" name="SRA_rate">SRA</input></li>
+ 	</ul>
+ 	
+ 	<ul>
+ 	 <h3>Tank Levels</h3> 
+ 	 
+ 	  <li><input type="text" name="H2O_tank"/>H20</li>
+ 	  <li><input type="submit" value="Override" /></li>
+ 	 </ul>
+	</form>
+	<p>{{SRA_override}}</p>
+
+{% endblock %}
