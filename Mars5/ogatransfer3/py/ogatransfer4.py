@@ -2,10 +2,10 @@ from time import sleep, time
 import subprocess
 
 import redis
+
+#rconfig.py, checkpipe.py etc need to be placed in same directory as this file
 import rconfig as cfg #connection data for redis database
-
-#from checkpipe import get_light, update_pipe_db, query_pipe_db #place checkpipe.py in same directory as this file
-
+from checkpipe import get_light #light sensor function
 
 import board
 import adafruit_dotstar as dotstar
@@ -36,7 +36,7 @@ pipeDb = ('H2_out','','','O2_out','','H2O_Pot_in') #as designated in database
 pipepin = (21,None,None,26,None,19)
 
 connectAll = 0
-pipevalue = [666,666,666,666,666,666]
+pipevalue = [None]*6 #photocells starting values
 
 
 redpin = 6
@@ -138,9 +138,10 @@ def startup():
                         piped[i] = 0
                     else:
                         piped[i]= 1
-                        print ("update database")
-                        inputs = (1, equip_id, pipeDb[i]) #connected - write status 1 to piping table
-                        update_pipe_db(inputs,db,c)
+                        #update database
+                        #Xinputs = (1, equip_id, pipeDb[i]) #connected - write status 1 to piping table
+                        #Xupdate_pipe_db(inputs,db,c)
+                        r.hset("OGA_pipe",pipes[i],"True")
                     sudisplay(piped,pipevalue)
             else:
                 piped[i]=1  #treat nonexistant pipes as connected
@@ -230,8 +231,6 @@ def shutdown(err):
         subprocess.call(["shutdown", "-h", "now"])  
    
     if err ==100: #reset error to 0
-        #inputs = (equip_id,"error", 0, datetime.now()) 
-        #insert_op_parm(inputs,db,c)
         r.xadd("OGA_error",{"reset":"0"})
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
@@ -338,21 +337,12 @@ def sudisplay (piped,pipevalue):
             draw.line((43,25, 43,64),fill="white") #vertical line 1/3rd across screen
             draw.line((86,25, 86,64),fill="white") #vertial line 2/3rds across screen
             draw.line((1,44, 128,44),fill="white") #horizontal line for 6 piping boxes
-            for count in range (len(pipes)):
-                x = 3
-                y =30
-                if count == 1:
-                    x = 46
-                elif count == 2:
-                    x = 89
-                elif count == 3:
-                    y = 51
-                elif count == 4:
-                    x = 46
-                    y = 51
-                elif count == 5:
-                    x = 89
-                    y = 51
+            #for count in range (len(pipes)):
+            coordDict = {0:{"x":3,"y":30},1:{"x":46,"y":30},2:{"x":89,"y":30},
+                         3:{"x":3,"y":51},4:{"x":46,"y":51},5:{"x":89,"y":51}}
+            for count in coordDict.values():
+                x=count["x"]
+                y=count["y"]  
                 draw.text((x,y), "{}  ".format(pipes[count]), font=size13, fill="white")
                 xcheckbox= x+21
                 ycheckbox= y+10
@@ -361,8 +351,9 @@ def sudisplay (piped,pipevalue):
                         draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
                         draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
                     else:
-                        if pipevalue[count] != 666:
-                            draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") #replace after troublehooting
+                        #T refactor after troublehooting
+                        if pipevalue[count]: #if this location has a pipe associated with it
+                            draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") 
                         else:
                             draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
                             draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
