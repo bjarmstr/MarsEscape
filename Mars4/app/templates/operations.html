@@ -3,27 +3,58 @@
 {% extends "base.html" %}
 
 {% block more_css %}
-<link rel="stylesheet" href="/static/css/clock_on.css">
+<link rel="stylesheet" href="/static/css/operations.css">
 {% endblock %}
 
 {% block content %}
-    <h1>Assembly Rates and Tank Levels</h1>
-    
-    <form action="#" method="post">
-    
-    <ul>
-    <h3>Process Rate</h3>
-      <li><input type="text" name="CDRA_rate" />CDRA</li>
- 	  <li><input type="text" name="SRA_rate">SRA</input></li>
- 	</ul>
- 	
- 	<ul>
- 	 <h3>Tank Levels</h3> 
- 	 
- 	  <li><input type="text" name="H2O_tank"/>H20</li>
- 	  <li><input type="submit" value="Override" /></li>
- 	 </ul>
-	</form>
-	<p>{{SRA_override}}</p>
 
+<h1>Assembly Rates and Tank Levels</h1>
+<div id="container">
+<!-- Form Column -->
+	<div class="form_area">
+	<h2>Override Values</h2>
+    {%if error%}
+		<p class="error"><strong>Error:</strong>{{error}}</p>
+	{% endif %}
+    <form class= "operation" action="#" method="post">
+    <div id="rate">
+	    <ul>
+	    <h3>Process Rate</h3>
+	      <li class="CO2_tank"><input type="text" name="CDRA_rate" />CDRA</li>
+	 	  <li class="CO2_tank"><input type="text" name="SRA_rate">SRA</input></li>
+	 	  <li class="H2O_tank"><input type="text" name="WPA_rate" >WPA</input></li>
+	 	  <li class="H2O_tank"><input type="text" name="OGA_rate">OGA</input></li>
+	 	</ul>
+ 	</div>
+ 	<div id="level">
+	 	<ul>
+	 	 <h3>Tank Level</h3> 
+	 	  <li class="CO2_tank"><input type="text" name="CO2_tank" />CO<sub>2</sub></li>
+	 	  <li class="H2O_tank"><input type="text" name="H2O_tank" />H<sub>2</sub>0</li>
+	 	  <li><input type="submit" value="Override" /></li>
+	 	 </ul>
+ 	 </div>
+	</form>
+	</div>
+<!-- Real Time Update Column -->
+	<div class="update_area">
+		<h2>Real Time Updates</h2>
+		<div id="rate_update">
+			<ul>
+		    <h3>Actual Process Rate</h3>
+		      <li class="CO2_tank"><input type="text" name="CDRA_rateU" />CDRA</li>
+		 	  <li class="CO2_tank"><input type="text" name="SRA_rateU">SRA</input></li>
+		 	  <li class="H2O_tank"><input type="text" name="WPA_rateU" >WPA</input></li>
+		 	  <li class="H2O_tank"><input type="text" name="OGA_rateU">OGA</input></li>
+		 	</ul>
+	 	</div>
+	 	<div id="level_update">
+		 	<ul>
+		 	 <h3>Actual Tank Level</h3> 
+		 	  <li class="CO2_tank"><input type="text" name="CO2_tankU" />CO<sub>2</sub></li>
+		 	  <li class="H2O_tank"><input type="text" name="H2O_tankU" />H<sub>2</sub>0</li>
+		 	 </ul>
+	 	 </div>
+	</div>	
+</div>
 {% endblock %}
