@@ -3,12 +3,117 @@
 {% extends "base.html" %}
 
 {% block more_css %}
-<link rel="stylesheet" href="/static/css/clock_on.css"
+<link rel="stylesheet" href="/static/css/piping.css">
 {% endblock %}
 
 {% block content %}
-    <h1>h1 piping</h1>
-    
-    <div><p>paragraph</p></div>
+    <h1>Piping</h1>
 
+
+	<h2>Photocell threshold value</h2>
+	<p>Increase the threshold, if piped but reading unconnected.  Decrease the 
+		threshold, if not piped but reading connected.</p>
+    {%if error%}
+		<p class="error"><strong>Error:</strong>{{error}}</p>
+	{% endif %}
+
+	    <form class= "piping" action="#" method="post">
+ <div class="wrapper">	  
+	    
+	  <!-- ------ CDRA -->
+	    <div class="CDRA">
+	   <table>
+	    <h4>CDRA</h4>
+		  <tr>
+		    <td><input type="text" name="CDRA H2O out" value="" /></td>
+		    <td><input class="button" type="submit" value="H2O out" /></td>
+		    <td class="threshold">10 000</td>
+		  </tr>
+		  <tr>
+		    <td><input type="text" name="CDRA CO2 out" value=""/></td>
+		    <td><input class="button" type="submit" value="CO2 out" /></td>
+		    <td class="threshold">10 000</td>
+		  </tr>
+		  
+		</table>
+	    </div>
+	    	<!-- ------ WPA -->
+	   <div class="WPA">
+	   <table>
+	    <h4>WPA</h4>
+		  <tr>
+		    <td><input type="text" name="WPA H2O pot out" value="" /></td>
+		    <td><input class="button" input type="submit" value="H2O pot out" /></td>
+		    <td>10000</td>
+		  </tr>
+		  <tr>
+		    <td><input type="text" name="WPA H2O" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O in" /></td>
+		    <td>10000</td>
+		  </tr>
+		  <tr>
+		    <td><input type="text" name="WPA H2O 3" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O 3" /></td>
+		    <td>10000</td>
+		  </tr>
+		  
+		</table>
+	    </div>
+	<!-- ------ SRA -->
+	   <div class="SRA">
+	   <table>
+	    <h4>SRA</h4>
+		  <tr>
+		    <td><input type="text" name="SRA_H2O_out" value="" /></td>
+		    <td><input class="button" input type="submit" value="H2O out" /></td>
+		    <td class="threshold">10 000</td>
+		  </tr>
+		  <tr>
+		    <td><input type="text" name="SRA_H2_out" value=""/></td>
+		    <td><input class="button" input type="submit" class="button" value="H2_out" /></td>
+		    <td class="threshold">10 000</td>
+		  </tr>
+		   <tr>
+		    <td><input type="text" name="SRA_CH4_out" value=""/></td>
+		    <td><input class="button" input type="submit" value="CH4_out" /></td>
+		    <td class="threshold">10 000</td>
+		  </tr>
+		   <tr>
+		    <td><input type="text" name="SRA_CH4_out" value=""/></td>
+		    <td><input class="button" input type="submit" value="CH4 out " /></td>
+		   <td class="threshold">10 000</td>
+		  </tr>
+		   <tr>
+		    <td><input type="text" name="SRA_CH4_out" value=""/></td>
+		    <td><input class="button" input type="submit" value="CH4 out" /></td>
+		    <td class="threshold">10 000</td>
+		  </tr>
+		</table>
+		</div>
+
+	<!-- ------ OGA -->
+	   <div class="OGA">
+	   <table>
+	    <h4>OGA</h4>
+		  <tr>
+		    <td><input class="entry" type="text" name="OGA H2O in" value="" /></td>
+		    <td><input class="button" input type="submit" value="H2O in" /></td>
+		    <td>10000</td>
+		  </tr>
+		  <tr>
+		    <td><input class="entry"type="text" name="OGA H2 out" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2 out " /></td>
+		    <td>10000</td>
+		  </tr>
+		  <tr>
+		    <td><input class="entry" type="text" name="OGA H2O 3" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O in" /></td>
+		    <td>10000</td>
+		  </tr>
+		  
+		</table>
+		</div>
+	   
+ </div>
+<p>press [this] button to permanently override these values in database </p>
 {% endblock %}

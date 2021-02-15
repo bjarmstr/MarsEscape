@@ -1,0 +1,95 @@
+@charset "ISO-8859-1";
+
+
+
+
+ 
+ 
+main{
+	margin-top: 5px; /*keeps the tab correct distance from main --*/
+}
+
+/* Start with the margins set to zero to avoid margin-collapse confusion */
+h1, h2, h3, ul,li {
+    margin: 0;
+ 
+}
+
+
+h2 {
+	text-align: center; 
+}
+
+td {
+	font-size:25px;
+}
+
+input[type=text] {
+	background: #F77F00; 
+	width: 60px;  /*size of entry field*/
+
+}
+
+
+
+.wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px,1fr));
+  
+}
+
+.wrapper > * {
+
+  border: 5px solid black;
+  border-radius: 5px;
+  margin: 10px;
+  width: 300px;
+ 
+}
+
+.CDRA .button{
+	border-width:5px;  
+    border-style:outset;
+    border-color: yellow;
+    font-size: 22px;
+    background: yellow;
+}
+
+.CDRA .threshold{
+	background:yellow;
+}
+
+.OGA .button{
+	border-width:5px;  
+    border-style:outset;
+    font-size: 22px;
+    background: green;
+    border-color: green;
+}
+
+.OGA .threshold{
+	background:green;
+}
+.WPA .button{
+	border-width:5px;  
+    border-style:outset;
+    font-size: 22px;
+    background: blue;
+    border-color: blue;
+}
+
+.WPA .threshold{
+	background: blue;
+}
+
+.SRA .button{
+	border-width:5px;  
+    border-style:outset;
+    font-size: 22px;
+    background: red;
+    border-color: red;
+}
+
+.SRA .threshold{
+	background: red;
+}
