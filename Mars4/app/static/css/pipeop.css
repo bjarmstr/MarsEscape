@@ -94,7 +94,11 @@ input[type=text] {
 	background: red;
 }
 
-.CO2 td:nth-child(3) {
+.CO2 td:nth-child(3), p.CO2 {
 	background: khaki;
+}
+
+.H2O td:nth-child(3), p.H2O {
+	background: teal;
 }
 

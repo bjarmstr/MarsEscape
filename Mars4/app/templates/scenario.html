@@ -20,15 +20,13 @@
 			{%if error%}
 		  		<p class="error"><strong>Error:</strong>{{error}}</p>
 			{% endif %}
-						
-		    {% for dict_item in scenario_list %}
-		      {% for key, value in dict_item.items() %} 		
+			{% for key, value in scenario_list.items() %} 		
 		   		  <p><label for="{{key}}">{{key}}</label> 
 		   		  <input type="checkbox" id="{{key}}" name="{{key}}" value="{{value}}" {% if key in checkOn %}checked{% endif %}>
 		   		  {{value}} Minutes
 				  </p>
-		      {% endfor %}
-		    {% endfor %}
+		     {% endfor %}
+
 		 <input type="submit" value="Add Time to Clock">
 		</form>
 	 </div>

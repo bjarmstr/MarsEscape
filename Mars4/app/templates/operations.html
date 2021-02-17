@@ -3,58 +3,70 @@
 {% extends "base.html" %}
 
 {% block more_css %}
-<link rel="stylesheet" href="/static/css/operations.css">
+<link rel="stylesheet" href="/static/css/pipeop.css">
+<script src="/static/js/getstream.js" defer></script>
 {% endblock %}
 
 {% block content %}
-
-<h1>Assembly Rates and Tank Levels</h1>
-<div id="container">
-<!-- Form Column -->
-	<div class="form_area">
-	<h2>Override Values</h2>
+    <h1>Assembly Rates and Tank Levels</h1>
+	
     {%if error%}
 		<p class="error"><strong>Error:</strong>{{error}}</p>
 	{% endif %}
-    <form class= "operation" action="#" method="post">
-    <div id="rate">
-	    <ul>
-	    <h3>Process Rate</h3>
-	      <li class="CO2_tank"><input type="text" name="CDRA_rate" />CDRA</li>
-	 	  <li class="CO2_tank"><input type="text" name="SRA_rate">SRA</input></li>
-	 	  <li class="H2O_tank"><input type="text" name="WPA_rate" >WPA</input></li>
-	 	  <li class="H2O_tank"><input type="text" name="OGA_rate">OGA</input></li>
-	 	</ul>
- 	</div>
- 	<div id="level">
-	 	<ul>
-	 	 <h3>Tank Level</h3> 
-	 	  <li class="CO2_tank"><input type="text" name="CO2_tank" />CO<sub>2</sub></li>
-	 	  <li class="H2O_tank"><input type="text" name="H2O_tank" />H<sub>2</sub>0</li>
-	 	  <li><input type="submit" value="Override" /></li>
-	 	 </ul>
- 	 </div>
-	</form>
-	</div>
-<!-- Real Time Update Column -->
-	<div class="update_area">
-		<h2>Real Time Updates</h2>
-		<div id="rate_update">
-			<ul>
-		    <h3>Actual Process Rate</h3>
-		      <li class="CO2_tank"><input type="text" name="CDRA_rateU" />CDRA</li>
-		 	  <li class="CO2_tank"><input type="text" name="SRA_rateU">SRA</input></li>
-		 	  <li class="H2O_tank"><input type="text" name="WPA_rateU" >WPA</input></li>
-		 	  <li class="H2O_tank"><input type="text" name="OGA_rateU">OGA</input></li>
-		 	</ul>
-	 	</div>
-	 	<div id="level_update">
-		 	<ul>
-		 	 <h3>Actual Tank Level</h3> 
-		 	  <li class="CO2_tank"><input type="text" name="CO2_tankU" />CO<sub>2</sub></li>
-		 	  <li class="H2O_tank"><input type="text" name="H2O_tankU" />H<sub>2</sub>0</li>
-		 	 </ul>
-	 	 </div>
-	</div>	
-</div>
+
+	    <form class= "operations" action="#" method="post">
+ <div class="wrapper">	  
+	    
+	  <!-- ------ Process Rates -->
+	    <div class="rates">
+	   <table>
+	    <h4>Process Rates</h4>
+	    
+		  <tr class="WPA H2O">
+		    <td><input class="entry" type="text" name="WPA" value="" /></td>
+		    <td><input class="button" input type="submit" value="WPA" /></td>
+		    <td id="out">0</td>
+		  </tr>
+		  <tr class="OGA H2O">
+		    <td><input class="entry" type="text" name="OGA" value=""/></td>
+		    <td><input class="button" input type="submit" value="OGA" /></td>
+		    <td id="OGArate">0</td>
+		  </tr>
+		  <tr class="CDRA CO2">
+		    <td><input class="entry" type="text" name="CDRA" value=""/></td>
+		    <td><input class="button" input type="submit" value="CDRA" /></td>
+		    <td id="CDRArate">0</td>
+		  </tr>
+		    <tr class="SRA CO2">
+		    <td><input class="entry" type="text" name="SRA" value=""/></td>
+		    <td><input class="button" input type="submit" value="SRA" /></td>
+		    <td id="SRArate">0</td>
+		  </tr>
+		  
+		</table>
+		<p>allowable values are between 0 and 150 %</p>
+	    </div>
+
+
+	<!-- ------ Tank Levels -->
+	   <div class="levels">
+	   <table>
+	    <h4>Tank Levels</h4>
+		  <tr class="H2O">
+		    <td><input class="entry" type="text" name="H2O" value="" /></td>
+		    <td><input class="button" input type="submit" value="H2O" /></td>
+		    <td>20</td>
+		  </tr>
+		  <tr class="CO2">
+		    <td><input class="entry" type="text" name="CO2" value=""/></td>
+		    <td><input class="button" input type="submit" value="CO2 " /></td>
+		    <td>19</td>
+		  </tr>
+	
+		</table>
+		<p class="H2O">WPA fills and OGA empties the H2O tank</p>
+		<p class="CO2">CDRA fills and SRA empties the H2O tank</p>
+		</div>
+	   
+ </div>
 {% endblock %}
