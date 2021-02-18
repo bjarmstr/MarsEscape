@@ -7,6 +7,7 @@ from app import app
 from flask import render_template, request, flash, Response
 from app import redis_client
 from app.computations import scenario_list, isInteger
+import json
 
 
 #context process allows variable to be passed to all routes
@@ -26,8 +27,18 @@ def redisbox():
 def stream():  
     def event_stream():
         while True:
-            new_stream_data = redis_client.xread({'chat': '$', 'chat2':'$'}, block=0, count=10)
-            yield 'data: %s\n\n' % new_stream_data   
+            stream_data = redis_client.xread({'OGA': '$', 'SRA':'$', 'WPA':'$', 
+                                              'CDRA':'$', 'H2O':'$', 'CO2':'$'}, block=0, count=10)
+            #parse data, presently not passing along stream name and time id stamp
+            
+            print(stream_data, "rawdata from stream ",type(stream_data))
+            raw_data = stream_data[0][1]
+            dict_data = raw_data[0][1]
+            for (equip_parm,value) in dict_data.items(): 
+                fdata ={equip_parm:value}
+                fj = json.dumps(fdata)
+                print(fj,"json",type(fj))
+            yield 'data: %s\n\n' % fj 
     return Response(event_stream(),
                           mimetype="text/event-stream")
  
@@ -70,7 +81,7 @@ def operations():
                         flash('FIX Entry Error and RESUBMIT')
                         error = "All values must be an integer "
                     else:
-                        to_database= key
+                        to_stream= key
                 print (key,":",value)
       
     else:

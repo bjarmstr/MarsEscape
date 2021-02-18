@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block content %}
-    <h1>Assembly Rates and Tank Levels</h1>
+
 	
     {%if error%}
 		<p class="error"><strong>Error:</strong>{{error}}</p>
@@ -25,26 +25,30 @@
 		  <tr class="WPA H2O">
 		    <td><input class="entry" type="text" name="WPA" value="" /></td>
 		    <td><input class="button" input type="submit" value="WPA" /></td>
-		    <td id="out">0</td>
+		    <td id="WPArate">0</td>
+		    <td> %</td>
 		  </tr>
 		  <tr class="OGA H2O">
 		    <td><input class="entry" type="text" name="OGA" value=""/></td>
 		    <td><input class="button" input type="submit" value="OGA" /></td>
 		    <td id="OGArate">0</td>
+		    <td> %</td>
 		  </tr>
 		  <tr class="CDRA CO2">
 		    <td><input class="entry" type="text" name="CDRA" value=""/></td>
 		    <td><input class="button" input type="submit" value="CDRA" /></td>
 		    <td id="CDRArate">0</td>
+		    <td> %</td>
 		  </tr>
 		    <tr class="SRA CO2">
 		    <td><input class="entry" type="text" name="SRA" value=""/></td>
 		    <td><input class="button" input type="submit" value="SRA" /></td>
 		    <td id="SRArate">0</td>
+		    <td> %</td>
 		  </tr>
 		  
 		</table>
-		<p>allowable values are between 0 and 150 %</p>
+		<p>Allowable values are between 0 and 150%.</p>
 	    </div>
 
 
@@ -52,20 +56,22 @@
 	   <div class="levels">
 	   <table>
 	    <h4>Tank Levels</h4>
-		  <tr class="H2O">
+		  <tr class="WPA H2O" >
 		    <td><input class="entry" type="text" name="H2O" value="" /></td>
 		    <td><input class="button" input type="submit" value="H2O" /></td>
-		    <td>20</td>
+		    <td id="H2Olevel">20</td>
+		    <td> %</td>
 		  </tr>
-		  <tr class="CO2">
+		  <tr class="CDRA CO2">
 		    <td><input class="entry" type="text" name="CO2" value=""/></td>
 		    <td><input class="button" input type="submit" value="CO2 " /></td>
-		    <td>19</td>
+		    <td id="CO2level">19</td>
+		    <td> %</td>
 		  </tr>
 	
 		</table>
-		<p class="H2O">WPA fills and OGA empties the H2O tank</p>
-		<p class="CO2">CDRA fills and SRA empties the H2O tank</p>
+		<p class="H2O">WPA fills and OGA empties the H2O tank.</p>
+		<p class="CO2">CDRA fills and SRA empties the H2O tank.</p>
 		</div>
 	   
  </div>

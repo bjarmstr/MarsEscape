@@ -10,18 +10,34 @@ main{
 }
 
 /* Start with the margins set to zero to avoid margin-collapse confusion */
-h1, h2, h3, h4, ul,li {
+h1, h2, h3, h4 {
     margin: 0;
+    margin-left: 20px;
  
 }
+
 
 
 h2 {
 	text-align: center; 
 }
 
+h4{
+	margin-top: 6px;
+	
+}
+
+table{
+	margin-left: 20px;
+}
 td {
-	font-size:25px;
+	font-size: 25px;
+	
+}
+
+p{
+	font-size: 17px;
+	padding-left:10px;
 }
 
 input[type=text] {
@@ -50,9 +66,11 @@ input[type=text] {
 .CDRA .button{
 	border-width:5px;  
     border-style:outset;
-    border-color: yellow;
+    color: yellow;
     font-size: 22px;
-    background: yellow;
+    background: #FCBF49;
+    border-color: #FCBF49;
+    min-width: 80.6px;
 }
 
 .CDRA .threshold{
@@ -63,8 +81,10 @@ input[type=text] {
 	border-width:5px;  
     border-style:outset;
     font-size: 22px;
-    background: green;
-    border-color: green;
+    background: #FCBF49;
+    border-color: #FCBF49;
+    color: green;
+    min-width: 80.6px;
 }
 
 .OGA .threshold{
@@ -74,8 +94,10 @@ input[type=text] {
 	border-width:5px;  
     border-style:outset;
     font-size: 22px;
-    background: blue;
-    border-color: blue;
+    min-width: 80.6px;
+    background: #FCBF49;
+    border-color: #FCBF49;
+    color: blue;
 }
 
 .WPA .threshold{
@@ -86,8 +108,10 @@ input[type=text] {
 	border-width:5px;  
     border-style:outset;
     font-size: 22px;
-    background: red;
-    border-color: red;
+    background: #FCBF49;
+    border-color: #FCBF49;
+    color: red;
+    min-width: 80.6px;
 }
 
 .SRA .threshold{
@@ -95,10 +119,12 @@ input[type=text] {
 }
 
 .CO2 td:nth-child(3), p.CO2 {
-	background: khaki;
+	background: #fc6902;
+	padding: 5px;
 }
 
 .H2O td:nth-child(3), p.H2O {
-	background: teal;
+	background: #faa203;
+	padding: 5px;
 }
 
