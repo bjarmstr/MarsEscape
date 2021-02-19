@@ -4,10 +4,12 @@ Created on Jan. 29, 2021
 @author: Jean Armstrong
 '''
 from app import app
-from flask import render_template, request, flash, Response
+from flask import render_template, request, flash, Response, session, redirect, url_for
+
 from app import redis_client
 from app.computations import scenario_list, isInteger
 import json
+import time
 
 
 #context process allows variable to be passed to all routes
@@ -42,32 +44,50 @@ def stream():
     return Response(event_stream(),
                           mimetype="text/event-stream")
  
-@app.route('/')
-@app.route('/scenario')
-@app.route('/index', methods=['GET', 'POST'])
+
+@app.route('/scenario', methods=['GET', 'POST']) #piping clock only starts if previous page was /scenario
 def scenario():
     error = None
+    scenario_time = 0
     if request.method == 'POST':
-        checkOn = request.form 
+        
         base_time = request.form['base-time']  
         if not isInteger(base_time):
             flash('CORRECT Entry Error and RESUBMIT')
             error = " Base time must be an integer "
-            clock = 30
-        else:
-            clock =int(base_time)       
-        
+        is_checked = request.form 
+        if error is None:
+            for key, value in is_checked.items():
+                scenario_time += int(is_checked[key])        
+        session['scenario_time']=scenario_time 
+    
     else:
-        checkOn = ""
+        is_checked = ""
         base_time = 30
-        clock = 30
+        scenario_time=30
+        session['starttime']= ""
+
     scenario_list = {'Fuse Blows': '5', 'Control board fails': '10', 'CO2 line leak': '15', 'D': '12'}
-    return render_template('scenario.html', title='Scenarios', scenario_list=scenario_list, checkOn = checkOn, base_time = base_time, clock=clock, error=error)
+    return render_template('scenario.html', title='Scenarios', scenario_list=scenario_list,
+                            is_checked = is_checked, base_time = base_time,  
+                            error=error, scenario_time=scenario_time)
 
 
 @app.route('/piping')
 def piping():
-    return render_template('piping.html', title='Piping')
+    url = request.referrer
+    if (url == "http://127.0.0.1:5000/scenario"):
+        session['starttime']= time.time()
+        if (int(session.get("scenario_time")) == 0):
+            return redirect(url_for('scenario'))
+        else:
+            countdown = (session.get("scenario_time"))*60
+    else:
+        elapsed_time = (time.time()) - (session.get('starttime'))
+        countdown = (session.get("scenario_time"))*60 - elapsed_time     
+    return render_template('piping.html', title='Piping', countdown=countdown)
+
+        
 
 @app.route('/operations', methods=['GET', 'POST'])
 def operations():
@@ -86,8 +106,8 @@ def operations():
       
     else:
         op_data = ""  #need initial value from database
-
-        
+    elapsed_time = (time.time()) - (session.get('starttime'))
+    countdown = (session.get("scenario_time"))*60 - elapsed_time 
     return render_template('operations.html', title='Operations',
-                           error=error, op_data=op_data)
+                           error=error, op_data=op_data, countdown=countdown)
 

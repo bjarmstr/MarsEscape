@@ -9,7 +9,7 @@ from config import Config
 
 app = Flask(__name__)
 app.config.from_object(Config)
-redis_client = FlaskRedis(app)
+redis_client = FlaskRedis(app, decode_responses=True)
 
 #this must stay at the bottom or circular import troubles arise
 from app import routes

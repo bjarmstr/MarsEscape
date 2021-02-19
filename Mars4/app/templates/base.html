@@ -4,9 +4,14 @@
 <meta charset="ISO-8859-1">
 	
       <title>{{colonyName}} Escape Room {{title}}</title>
-      <link rel="icon" type="image/png" href="/static/images/favicon-32x32.png" sizes="32x32" />
+      <link rel="icon" type="image/png" href="/static/images/favicon-32x32.png" 
+      		sizes="32x32" />
       
       <link rel="stylesheet" href="/static/css/main_style.css">
+      {% if active_page != "scenario"%}
+     	 <script> var countdown = '{{countdown}}';</script>
+     	 <script src="/static/js/countdown.js" defer></script>
+      {% endif %}
       
 	  {% block more_css%}
 	  {% endblock %}
@@ -25,7 +30,7 @@
 	 
 	 
 	<div class="main-container">
-	{% if active_page == "piping" or active_page == "operations"%}
+	{% if active_page != "scenario"%}
 	<nav>
  			<ul id="tabs">
 			<li class="first"><a {% if active_page == "piping"%}class="active_pg"{%endif%} href="/piping">Piping</a></li>
@@ -46,6 +51,12 @@
 		  {% endif %}
 		{% endwith %}
 		  
+	<!-- countdown timer -->	
+	{% if active_page != "scenario"%}
+	<h3>Oxygen Remaining: 
+		<div id="countdown"> </div> 
+	</h3>
+	{% endif %}	  
 	<!-- main content here -->	  
 	        {% block content %}{% endblock %}
 	 </main>

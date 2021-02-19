@@ -173,11 +173,8 @@ def running():
     first = True
     trackMenu = 0
     #when start button pressed rate changed to 100 in database and OGArate
-    #Xinputs = (equip_id,"rate", 100, datetime.now())
-    #Xinsert_op_parm(inputs,db,c)
     dict_rate = {"rate":"100"}
     r.xadd("OGA",dict_rate)
-    
     OGArate = 100
     OGArateprev = 100
     led_strip(OGArate) 
@@ -194,7 +191,7 @@ def running():
         if err != 0:
             print ("error")
             status = "shutdown" 
-    
+            
     shutdown(err)
             
 def shutdown(err):
@@ -277,7 +274,6 @@ def run_selector():
                 newmenu = 1
             if (Rotary_index == 1):
                 Rotary_index = 0
-                #display_rate()
                 newmenu = 2
             if (Rotary_index == 2):
                 newmenu = 3
@@ -292,9 +288,6 @@ def run_selector():
             if (Rotary_index == 0):
                 Menu_index = 0
             else:
-                selection = 1
-                #Xinputs = (equip_id,"error", 100, datetime.now()) #error 100 user selected shutdown
-                #Xinsert_op_parm(inputs,db,c)
                 r.xadd("OGA_error",{"user":"100"})
                 led_strip(0)
             trackMenu = 1
@@ -317,9 +310,7 @@ def run_selector():
             trackMenu = 2
             Menu_index = 0
             circular = True
-            first = True
-            #Xinputs = (equip_id,"rate", OGArate, datetime.now())
-            #Xinsert_op_parm(inputs,db,c)        
+            first = True      
             r.xadd(("OGA"),{"rate":OGArate})                             
     elif (Menu_index == 3):
         display_tank()
@@ -358,7 +349,6 @@ def sudisplay (piped,pipevalue):
                             draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
                             draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
                             
-
 def invert(draw,x,y,text):
     length = len(text)
     if (length == 4): length = 3
@@ -366,11 +356,9 @@ def invert(draw,x,y,text):
     draw.text((x, y), text, font= size12, outline=0,fill="black")
     
 def display_main(Rotary_index):
-    
     global H2Olevel, OGArate
     strH2Olevel = str(int(H2Olevel))
     strOGArate = str(OGArate)
-    
     menustr = [['  Status: ','Running',''], ['    Rate:',strOGArate,'%'], [' H2OTank:',strH2Olevel,'%Full',]]
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
@@ -381,8 +369,7 @@ def display_main(Rotary_index):
                 draw.text((87,i*15+10), menustr[i][2], font=size12, fill=255)
             else:
                 draw.text((61, i*15+10), menustr[i][1], font=size12, fill=255)
-                draw.text((87,i*15+10), menustr[i][2], font=size12, fill=255)
-      
+                draw.text((87,i*15+10), menustr[i][2], font=size12, fill=255)   
 
 def display_shutdown():
     with canvas(device) as draw:
@@ -413,12 +400,8 @@ def display_tank():
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((7, 3), 'H2O Tank Level ', font=size13, fill=255)
-        #Xinputs = ("14", "level") #HO2 pot tank id 14
-        #XH2Olevel,TimeT = query_op_parm(inputs,c)
         H2Olevel = get_redis("H2Otank")
         led_strip_lvl(int(H2Olevel))
-        #Xinputs = ("2", "rate") 
-        #XstrWPArate,TimeT = query_op_parm(inputs,c)
         WPArate = get_redis("WPA")
         if (WPArate - OGArate) == 0:
             direction = "stable"
@@ -467,7 +450,6 @@ def led_strip(colorOn):
 
 
 def led_strip_lvl(colorOn):
-    
     lightdots = colorOn/2.5
     dotRemainder = lightdots - int(lightdots)
     lightdots = int(lightdots)
@@ -478,8 +460,7 @@ def led_strip_lvl(colorOn):
     print(dotRemainder,"dotRemainder -how many dots are lit")
     partialdot = int (60*dotRemainder)
     dots[(39-lightdots)] = (0,0,partialdot)
-   # for dot in range(40-lightdots):
-    #    dots[dot] = (0,0,0) #turn remainder off
+
     
 def get_redis(equip_stream):
     #Finds the newest rate/level from the stream and the time it was recorded

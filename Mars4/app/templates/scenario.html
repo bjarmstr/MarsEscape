@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-{% set active_page = "index" %}
+{% set active_page = "scenario" %}
 {% extends "base.html" %}
 
 {% block more_css %}
@@ -11,7 +11,7 @@
 <div class="flexbox-container">
 	<div class="scenarios">
 		
-		<form action="/index" method="post">
+		<form action="/scenario" method="post">
 
 			<p><label for="base_time">Time required for Base Scenario</label>
 			<input type="text" id="base-time" name="base-time" value="{{base_time}}" maxlength="3" size="3">&nbsp;minutes
@@ -22,7 +22,7 @@
 			{% endif %}
 			{% for key, value in scenario_list.items() %} 		
 		   		  <p><label for="{{key}}">{{key}}</label> 
-		   		  <input type="checkbox" id="{{key}}" name="{{key}}" value="{{value}}" {% if key in checkOn %}checked{% endif %}>
+		   		  <input type="checkbox" id="{{key}}" name="{{key}}" value="{{value}}" {% if key in is_checked %}checked{% endif %}>
 		   		  {{value}} Minutes
 				  </p>
 		     {% endfor %}
@@ -33,7 +33,7 @@
 	 <div class="clockbox">
 	 	<h1>Escape Room Clock</h1>
 	 	<h2>Countdown</h2>
-	 	<p class="clock">{{clock}}</p>
+	 	<p class="clock">{{scenario_time}}</p>
 	 	<p> minutes of Oxygen remaining</p>
 	 	<p><a id="start-timer" href="piping">Start Timer</a></p>
 	 </div>
