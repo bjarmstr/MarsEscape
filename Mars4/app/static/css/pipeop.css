@@ -59,7 +59,7 @@ input[type=text] {
   border: 5px solid black;
   border-radius: 5px;
   margin: 10px;
-  width: 300px;
+
  
 }
 
@@ -73,9 +73,7 @@ input[type=text] {
     min-width: 80.6px;
 }
 
-.CDRA .threshold{
-	background:yellow;
-}
+
 
 .OGA .button{
 	border-width:5px;  
@@ -87,9 +85,7 @@ input[type=text] {
     min-width: 80.6px;
 }
 
-.OGA .threshold{
-	background:green;
-}
+
 .WPA .button{
 	border-width:5px;  
     border-style:outset;
@@ -99,6 +95,7 @@ input[type=text] {
     border-color: #FCBF49;
     color: blue;
 }
+
 
 .WPA .threshold{
 	background: blue;
@@ -112,10 +109,6 @@ input[type=text] {
     border-color: #FCBF49;
     color: red;
     min-width: 80.6px;
-}
-
-.SRA .threshold{
-	background: red;
 }
 
 .CO2 td:nth-child(3), p.CO2 {

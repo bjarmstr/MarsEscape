@@ -23,14 +23,14 @@
 	   <table>
 	    <h4>CDRA</h4>
 		  <tr>
-		    <td><input type="text" name="CDRA H2O out" value="" /></td>
+		    <td><input type="text" name="CDRA-H2O-out" value="" /></td>
 		    <td><input class="button" type="submit" value="H2O out" /></td>
-		    <td class="threshold">10 000</td>
+		    <td class="threshold">{{pipe_thresh["CDRA-H2O-out"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input type="text" name="CDRA CO2 out" value=""/></td>
+		    <td><input type="text" name="CDRA-CO2-out" value=""/></td>
 		    <td><input class="button" type="submit" value="CO2 out" /></td>
-		    <td class="threshold">10 000</td>
+		    <td class="threshold">{{pipe_thresh["CDRA-CO2-out"]}}</td>
 		  </tr>
 		  
 		</table>
@@ -40,21 +40,25 @@
 	   <table>
 	    <h4>WPA</h4>
 		  <tr>
-		    <td><input type="text" name="WPA H2O pot out" value="" /></td>
+		    <td><input type="text" name="WPA-H2O-pot-out" value="" /></td>
 		    <td><input class="button" input type="submit" value="H2O pot out" /></td>
-		    <td>10000</td>
+		    <td>{{pipe_thresh["WPA-H2O-pot-out"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input type="text" name="WPA H2O" value=""/></td>
-		    <td><input class="button" input type="submit" value="H2O in" /></td>
-		    <td>10000</td>
+		    <td><input type="text" name="WPA-H2O-in-CO2" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O in CO2" /></td>
+		    <td>{{pipe_thresh["WPA-H2O-in-CO2"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input type="text" name="WPA H2O 3" value=""/></td>
-		    <td><input class="button" input type="submit" value="H2O 3" /></td>
-		    <td>10000</td>
+		    <td><input type="text" name="WPA-H2O-in-CDRA" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O in CDRA" /></td>
+		    <td>{{pipe_thresh["WPA-H2O-in-CDRA"]}}</td>
 		  </tr>
-		  
+		    <tr>
+		    <td><input type="text" name="WPA-H2O-in-SRA" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O in SRA" /></td>
+		    <td>{{pipe_thresh["WPA-H2O-in-SRA"]}}</td>
+		  </tr>
 		</table>
 	    </div>
 	<!-- ------ SRA -->
@@ -62,29 +66,24 @@
 	   <table>
 	    <h4>SRA</h4>
 		  <tr>
-		    <td><input type="text" name="SRA_H2O_out" value="" /></td>
+		    <td><input type="text" name="SRA-H2O-out" value="" /></td>
 		    <td><input class="button" input type="submit" value="H2O out" /></td>
-		    <td class="threshold">10 000</td>
+		    <td class="threshold">{{pipe_thresh["SRA-H2O-out"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input type="text" name="SRA_H2_out" value=""/></td>
-		    <td><input class="button" input type="submit" class="button" value="H2_out" /></td>
-		    <td class="threshold">10 000</td>
+		    <td><input type="text" name="SRA-H2-in" value=""/></td>
+		    <td><input class="button" input type="submit" class="button" value="H2 in" /></td>
+		    <td class="threshold">{{pipe_thresh["SRA-H2-in"]}}</td>
 		  </tr>
 		   <tr>
-		    <td><input type="text" name="SRA_CH4_out" value=""/></td>
-		    <td><input class="button" input type="submit" value="CH4_out" /></td>
-		    <td class="threshold">10 000</td>
-		  </tr>
-		   <tr>
-		    <td><input type="text" name="SRA_CH4_out" value=""/></td>
-		    <td><input class="button" input type="submit" value="CH4 out " /></td>
-		   <td class="threshold">10 000</td>
-		  </tr>
-		   <tr>
-		    <td><input type="text" name="SRA_CH4_out" value=""/></td>
+		    <td><input type="text" name="SRA-CH4-out" value=""/></td>
 		    <td><input class="button" input type="submit" value="CH4 out" /></td>
-		    <td class="threshold">10 000</td>
+		    <td class="threshold">{{pipe_thresh["SRA-CH4-out"]}}</td>
+		  </tr>
+		   <tr>
+		    <td><input type="text" name="SRA-N2-in" value=""/></td>
+		    <td><input class="button" input type="submit" value="N2 in " /></td>
+		   <td class="threshold">{{pipe_thresh["SRA-N2-in"]}}</td>
 		  </tr>
 		</table>
 		</div>
@@ -94,24 +93,24 @@
 	   <table>
 	    <h4>OGA</h4>
 		  <tr>
-		    <td><input class="entry" type="text" name="OGA H2O in" value="" /></td>
+		    <td><input class="entry" type="text" name="OGA-O2-out" value="" /></td>
 		    <td><input class="button" input type="submit" value="H2O in" /></td>
-		    <td>10000</td>
+		    <td>{{pipe_thresh["OGA-O2-out"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input class="entry"type="text" name="OGA H2 out" value=""/></td>
+		    <td><input class="entry"type="text" name="OGA-H2-out" value=""/></td>
 		    <td><input class="button" input type="submit" value="H2 out " /></td>
-		    <td>10000</td>
+		    <td>{{pipe_thresh["OGA-H2-out"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input class="entry" type="text" name="OGA H2O 3" value=""/></td>
+		    <td><input class="entry" type="text" name="OGA-H2O-pot-in" value=""/></td>
 		    <td><input class="button" input type="submit" value="H2O in" /></td>
-		    <td>10000</td>
+		    <td>{{pipe_thresh["OGA-H2O-pot-in"]}}</td>
 		  </tr>
 		  
 		</table>
 		</div>
 	   
  </div>
-<p>press [this] button to permanently override these values in database </p>
+<p>these changes permanently override the values in database </p>
 {% endblock %}

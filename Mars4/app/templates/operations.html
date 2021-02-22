@@ -21,29 +21,30 @@
 	    <div class="rates">
 	   <table>
 	    <h4>Process Rates</h4>
-	    
+  
+
 		  <tr class="WPA H2O">
-		    <td><input class="entry" type="text" name="WPA" value="" /></td>
+		    <td><input class="entry" type="text" name="WPA-rate" value="" /></td>
 		    <td><input class="button" input type="submit" value="WPA" /></td>
-		    <td id="WPArate">0</td>
+		    <td id="WPA-rate">{{op_valid["WPA-rate"]}}</td>
 		    <td> %</td>
 		  </tr>
 		  <tr class="OGA H2O">
-		    <td><input class="entry" type="text" name="OGA" value=""/></td>
+		    <td><input class="entry" type="text" name="OGA-rate" value=""/></td>
 		    <td><input class="button" input type="submit" value="OGA" /></td>
-		    <td id="OGArate">0</td>
+		    <td id="OGA-rate">{{op_valid["OGA-rate"]}}</td>
 		    <td> %</td>
 		  </tr>
 		  <tr class="CDRA CO2">
-		    <td><input class="entry" type="text" name="CDRA" value=""/></td>
+		    <td><input class="entry" type="text" name="CDRA-rate" value=""/></td>
 		    <td><input class="button" input type="submit" value="CDRA" /></td>
-		    <td id="CDRArate">0</td>
+		    <td id="CDRA-rate">{{op_valid["CDRA-rate"]}}</td>
 		    <td> %</td>
 		  </tr>
 		    <tr class="SRA CO2">
-		    <td><input class="entry" type="text" name="SRA" value=""/></td>
+		    <td><input class="entry" type="text" name="SRA-rate" value=""/></td>
 		    <td><input class="button" input type="submit" value="SRA" /></td>
-		    <td id="SRArate">0</td>
+		    <td id="SRA-rate">{{op_valid["SRA-rate"]}}</td>
 		    <td> %</td>
 		  </tr>
 		  
@@ -57,21 +58,55 @@
 	   <table>
 	    <h4>Tank Levels</h4>
 		  <tr class="WPA H2O" >
-		    <td><input class="entry" type="text" name="H2O" value="" /></td>
+		    <td><input class="entry" type="text" name="H2O-level" value="" /></td>
 		    <td><input class="button" input type="submit" value="H2O" /></td>
-		    <td id="H2Olevel">20</td>
+		    <td id="H2O-level">{{op_valid["H2O-level"]}}</td>
 		    <td> %</td>
 		  </tr>
 		  <tr class="CDRA CO2">
-		    <td><input class="entry" type="text" name="CO2" value=""/></td>
+		    <td><input class="entry" type="text" name="CO2-level" value=""/></td>
 		    <td><input class="button" input type="submit" value="CO2 " /></td>
-		    <td id="CO2level">19</td>
+		    <td id="CO2-level">{{op_valid["CO2-level"]}}</td>
 		    <td> %</td>
 		  </tr>
 	
 		</table>
 		<p class="H2O">WPA fills and OGA empties the H2O tank.</p>
 		<p class="CO2">CDRA fills and SRA empties the H2O tank.</p>
+		</div>
+		
+			<!-- ------ Error Codes -->
+	   <div class="Errors">
+	   <table>
+	    <h4>Initiate Error Code</h4>
+	    <p>these are not real time values, hit refresh to view latest value</p>
+		  <tr class="WPA Error" >
+		    <td><input class="entry" type="text" name="WPA-error" value="" /></td>
+		    <td><input class="button" input type="submit" value="WPA Error" /></td>
+		    <td id="WPA-error">{{error_code["WPA-error"]}}</td>
+		
+		  </tr>
+		  <tr class="CDRA Error">
+		    <td><input class="entry" type="text" name="CDRA-error" value=""/></td>
+		    <td><input class="button" input type="submit" value="CDRA " /></td>
+		    <td id="CDRA-error">{{error_code["CDRA-error"]}}</td>
+		
+		  </tr>
+		    <tr class="SRA Error" >
+		    <td><input class="entry" type="text" name="SRA-error" value="" /></td>
+		    <td><input class="button" input type="submit" value="SRA Error" /></td>
+		    <td id="SRA-error">{{error_code["SRA-error"]}}</td>
+
+		  </tr>
+		  <tr class="OGA Error">
+		    <td><input class="entry" type="text" name="OGA-error" value=""/></td>
+		    <td><input class="button" input type="submit" value="OGA " /></td>
+		    <td id="OGA-error">{{error_code["OGA-error"]}}</td>
+
+		  </tr>
+		
+		</table>
+		<p>**entering an error code that the unit does not recognize may result in the assembly program crashing**</p>
 		</div>
 	   
  </div>
