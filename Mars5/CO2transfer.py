@@ -77,7 +77,7 @@ CO2level = 0
 trackMenu = 0
 Status = "startup"
 first = True
-CO2leak = False
+test_leak_Arduino = False
 menu_status = ['NO', 'YES'] #shutdown menu
 
 
@@ -88,7 +88,7 @@ def init():
     return
 
 def serial_compile():
-    global Selector_counter,  Button_pressed, CO2leak
+    global Selector_counter,  Button_pressed, test_leak_Arduino, CO2_leak_Arduino
     print("serial_compile")
     buffer_string = ''
     add_to_buff = ''
@@ -104,7 +104,7 @@ def serial_compile():
             lines = buffer_string.split('\\r\\n')
             last_received = lines[-2] #last item in list is empty and second last contains latest data 
             #print(last_received,"last received")
-            print(lines,"pressure?")
+            print(lines,"Uno")
             if "Left" in last_received:
                 Selector_counter = Selector_counter +1
                 print("down")
@@ -115,7 +115,10 @@ def serial_compile():
                 print("button select")
                 Button_pressed = 1  #what if button and middle selector pushed at same time 
             elif "OK" in last_received:
-                CO2leak = False
+                CO2_leak_Arduino = False
+                print("CO2 leak Fixed")
+            elif "FAIL" in last_received:
+                test_leak_Arduino = False
         elif buffer_string !="":
             add_to_buff = buffer_string
             
@@ -163,6 +166,7 @@ def boot_message():
         draw.text((10, 23), "Initializing Boot", font=size12, fill="white")
         draw.text((10, 33), "Sequence ...", font=size12, fill="white")
     sleep(2.5)
+    init() #this was in firststart of startup ~line230
         
 def init_database():
     global r
@@ -222,7 +226,6 @@ def startup(first_start):
     
     if Button_pressed == 1 :
         if first_start == True:
-            init()
             print("initialize here?")
             ser.write(b'B')
         first_start = False
@@ -263,62 +266,84 @@ def running():
             print ("error")
             Status = "shutdown" 
             if err == CO2_LEAK_CODE:
-                scenario_CO2leak()
+                scenario_CO2_leak()
                 Status = "running"
+                CDRArate = get_redis("CDRA")  #
     
     shutdown(err)
 
-def scenario_CO2leak(): 
-    global Button_pressed, CO2leak  
-    CO2leak = True
+def scenario_CO2_leak(): 
+    global Button_pressed, test_leak_Arduino, CO2_leak_Arduino
     ser.write(b'L')
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
         draw.text((3, 2), "Status: ", font=size12, fill="white")
         draw.text((20, 14), "ERROR CODE", font=size12, fill="white")#y12 too high
         draw.text((25,28),"{}".format(CO2_LEAK_CODE), font=size12, fill="white")#26 squished
-        #draw.text((48,42),"pressure", font=size13, fill="white") 
-    while CO2leak == True:  
-        led_bulb("none")
-        led_strip(0)
-        for i in range (10):   #number of times led flashes/2
+    CDRArate = get_redis("CDRA")
+    led_bulb("none")
+    led_strip(0)
+    sleep(.2)
+    while Button_pressed == 0:
+        CDRArate = reduce_rate(CDRArate)
+        for i in range (10):   
             if i % 2 == 0:
                 led_bulb("none")
                 dots[0] = (30,0,0)
             else:
                 dots[0] = (0,0,0)
                 led_bulb("red")
-            sleep(.2)
-        if Button_pressed != 0:
+    Button_pressed = 0
+    test_leak_Arduino = True 
+    CO2_leak_Arduino = True
+    led_bulb("none")
+    led_strip(0)
+    while CO2_leak_Arduino == True:  
+        ser.write(b'C')
+        sleep(.8)
+        print("above leak test")
+        j = 0
+        while test_leak_Arduino == True:
+            CDRArate = reduce_rate(CDRArate)
+            j += 1
             with canvas(device) as draw:
                 draw.rectangle(device.bounding_box, outline="black", fill="black")
                 draw.text((3, 2), "Checking Status: ", font=size12, fill="white")
-                draw.text((20, 14),"{}".format(CO2_LEAK_CODE), font=size12, fill="white")#y12
+                draw.text((3, 16),"{},{}".format(j,CDRArate), font=size12, fill="white")
             err = get_redis("CDRA-error")  #MarsOne Operator can override pressure error
-            if err != 111:
-                CO2leak = False;
-            sleep(3)
-            Button_pressed = 0
-            if CO2leak == False:
-                with canvas(device) as draw:
-                    draw.rectangle(device.bounding_box, outline="black", fill="black")
-                    draw.text((3, 2), "Pressure Restored: ", font=size12, fill="white")
-                    draw.text((20, 15),"Press Select", font=size12, fill="white")#y
-                    draw.text((25,28),"to continue", font=size12, fill="white")
-                r.xadd("CDRA-error",{"CDRA-error":"0"})
-                while Button_pressed ==0:      
-                    for i in range (10):
-                        dots[0] = (0,50,0)
-                        led_bulb("green")
-                led_bulb("none")
-                led_strip(0)
-                Button_pressed = 0
-            else:
+            if err != 111:  #any error code will reset CO2 error to 0
+                test_leak_Arduino = False
+            progress_led(j)
+            print("test leak Arduino")
+            if CO2_leak_Arduino == False:  #leak fixed 
+                    test_leak_Arduino = False    #leave loop
+            elif test_leak_Arduino == False: #leak wasn't fixed - need to try again
                 with canvas(device) as draw:
                     draw.rectangle(device.bounding_box, outline="black", fill="black")
                     draw.text((3, 2), "ERROR", font=size12, fill="white")
                     draw.text((20, 14),"{}".format(CO2_LEAK_CODE), font=size12, fill="white")#y12
-                print("still leaking")
+                    draw.text((25,28),"Check Status", font=size12, fill="white")
+                    draw.text((25,40), "Again?",font=size12, fill="white")  
+                while Button_pressed == 0:
+                    sleep(.2)  #need to sleep to give other threads priority
+                Button_pressed = 0
+                test_leak_Arduino = True
+                ser.write(b'C')
+    #Leak Fixed
+    with canvas(device) as draw:
+        draw.rectangle(device.bounding_box, outline="black", fill="black")
+        draw.text((3, 2), "Pressure Restored: ", font=size12, fill="white")
+        draw.text((25,28),"Continue?", font=size12, fill="white")
+    r.xadd("CDRA-error",{"CDRA-error":"0"})
+    while Button_pressed ==0:      
+        for i in range (8):
+            dots[i] = (0,0,50)
+            led_bulb("blue") #green not working?
+    led_bulb("none")
+    led_strip(0)
+    Button_pressed = 0
+    test_leak_Arduino = False  
+     
            
             
 def shutdown(err):
@@ -628,6 +653,23 @@ def led_strip_lvl(colorOn):
     partialdot = int (60*dotRemainder)
     
     dots[int(lightdots)] = (0,0,partialdot)
+    
+def progress_led(i):
+    for j in range (8):
+        j % 8   
+        if j <= i:
+            dots[j] = (0,0,30)
+        else:
+            dots[j] = (0,0,0)
+            
+
+def reduce_rate(CDRArate):
+    #if count is even, or divisible by x -slow rate down
+    if (CDRArate >= 1):
+        CDRArate -= 1
+        dict_rate = {"CDRA-rate":CDRArate}
+        r.xadd("CDRA",dict_rate)
+    return CDRArate
     
 def get_redis(equip_stream):
     raw_data = r.xrevrange(equip_stream,"+","-",1)
