@@ -31,9 +31,6 @@ def hello():
     
     error_stream = ["CDRA-error", "WPA-error","OGA-error","SRA-error","CO2-error","H2O-error"]
     for stream in error_stream:
-        print(stream,"stream")
-        dict_value ={"guess":"what"}
-        print(dict_value,"what type", type(dict_value))
         red.xadd(stream, {stream:"0"}) 
 
     for equip in error_stream:
@@ -41,7 +38,7 @@ def hello():
         dict_info = ((raw_data[0])[1]) #locate key:value in stream
         for key,value in dict_info.items():  
             error_code[key] = value
-    print(error_code,"error-code")
+    print(error_code,"error-code dictionary for all error-streams")
     
    
 

@@ -128,7 +128,6 @@ def wpa_preheat():
             assemblies["WPA"]["temp"] += DEG_INC
             sleep(1)
         temp_cycle = "start_holding"
-
     return
 
        

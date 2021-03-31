@@ -2,7 +2,7 @@
 Created in 2019-2021
 @author: Jean Armstrong
 
-presently version ogatransfer7.py
+presently version ogatransfer8.py
 
 
 """
@@ -13,7 +13,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s;%(message)s"
     )
-
+import sys
 import subprocess
 
 import redis
@@ -113,7 +113,8 @@ def rotary_interrupt(A_or_B):
         if A_or_B == Enc_B:                         # Turning direction depends on 
             Rotary_counter -= 1                     # which input gave last interrupt
         else:                                       # so depending on direction either
-            Rotary_counter += 1                     # increase or decrease counter
+            Rotary_counter += 1  
+        #print(Rotary_counter,"Rotary Counter")                   # increase or decrease counter
         LockRotary.release()                        # and release lock
     return                                          # THAT'S IT
 
@@ -137,7 +138,6 @@ def startup():
     global connectAll, Button_pressed, status
     Button_pressed = 0
     piped = [0] * 6
-    print("top of startup")
     while connectAll < 6:
         for i in range(6):       #there are 6 squares that could have piping
             if pipepin[i] is not None: #if a pipe exists in this square
@@ -170,6 +170,7 @@ def startup():
             draw.rectangle(device.bounding_box, outline="white", fill="black")
             draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
             draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
+        sleep(.2)
     
     if Button_pressed == 1 :
         running(0,0)
@@ -208,15 +209,17 @@ def running(trackMenu, rotary_index):
     shutdown(err)
             
 def shutdown(err):
-    global Button_pressed
-    r.xadd(("OGA"),{"OGA-rate":"0"}) #tell the db that OGA has shutdown
+    global Button_pressed, Rotary_counter
+    r.xadd(("OGA"),{"OGA-rate":"0"}) #tell the db that unit has shutdown ** this was not in origonal code
     with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="black", fill="black")
-            draw.text((3, 2), "Status: ", font=size12, fill="white")
-            draw.text((20, 12), "Shutting Down", font=size12, fill="white")
-            if err != 100:
-                draw.text((25,26),"ERROR CODE", font=size12, fill="white")
-                draw.text((48,42),"{}".format(int(err)), font=size13, fill="white") 
+        draw.rectangle(device.bounding_box, outline="black", fill="black")
+        draw.text((3, 2), "Status: ", font=size12, fill="white")
+        draw.text((20, 17), "Shutting Down", font=size12, fill="white") #y12 too high
+        if err != 100:
+            err = int(err)
+            draw.text((25,26),"ERROR CODE", font=size12, fill="white")
+            draw.text((48,42),"{}".format(err), font=size13, fill="white") 
+    Button_pressed = 0
     while Button_pressed == 0:
         led_bulb("none")
         led_strip(0)
@@ -229,46 +232,69 @@ def shutdown(err):
                 led_bulb("red")
             sleep(.2)
     start = time()  #long press to shutdown pi
+    led_bulb("blue")
     while GPIO.input(sbutton) == GPIO.LOW:
         sleep(0.01)
     length = time() - start
-    print (length)
+    toggle_pressed = Rotary_counter
     if length > 4:
-        with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="black", fill="black")
-            draw.text((7, 5), "Turn off Power", font=size14, fill="white")
-            draw.text((11, 30), "to Restart ", font=size14, fill="white")
-        subprocess.call(["shutdown", "-h", "now"])  
-   
+        r.xadd("OGA-error",{"OGA-error":"0"})
+        Button_pressed = 0
+        while (Button_pressed ==0):
+            with canvas(device) as draw:
+                draw.rectangle(device.bounding_box, outline="black", fill="black")
+                draw.text((7, 14), "Start Button", font=size12, fill="white")
+                draw.text((11, 24), "to Shutdown ", font=size12, fill="white")
+                draw.text((7, 34), "Turn Dial", font=size12, fill="white")
+                draw.text((11, 44), "to Exit ", font=size12, fill="white")
+            sleep(2)
+            
+            if (Rotary_counter != toggle_pressed):  
+                with canvas(device) as draw:
+                    draw.rectangle(device.bounding_box, outline="black", fill="black")
+                    draw.text((7, 15), "SSH or Use", font=size12, fill="white")
+                    draw.text((11, 25), "Terminal", font=size12, fill="white") 
+                    draw.text((11, 35), "to shutdown Pi", font=size12, fill="white") 
+                sleep(3)    
+                sys.exit()
+            if (Button_pressed ==1):
+                with canvas(device) as draw:
+                    draw.rectangle(device.bounding_box, outline="black", fill="black")
+                    draw.text((7, 5), "Turn off Power", font=size14, fill="white")
+                    draw.text((11, 30), "to Restart ", font=size14, fill="white")         
+                sleep(1)
+                subprocess.call(["shutdown", "-h", "now"])  
+                sleep(3)
+    print(length,"length of button push")
     if err ==100: #reset error to 0
         r.xadd("OGA-error",{"OGA-error":"0"})
+        err = 0
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
-    Button_pressed = 0
-    #back to main function when button pressed
+    Button_pressed = 0  #back to main function
   
     
             
 def rotary_status(maxIndex,circular, rotary_index):
-        global Rotary_counter, LockRotary
-        LockRotary.acquire()                    # global variables locked, can only be changed by this function until released
-        NewCounter = Rotary_counter         # get counter value
-        #logging.debug("counter", NewCounter)
-        Rotary_counter = 0                      # RESET IT TO 0
-        LockRotary.release()                    # and release lock
-        if (NewCounter !=0):  #**change this to allow for more than one update at once?
-            if (NewCounter > 0):
-                rotary_index += 1
-            elif (NewCounter<0):
-                rotary_index -= 1 
-            if (rotary_index > maxIndex):
-                rotary_index = maxIndex
-                if circular == True:
-                    rotary_index = 0
-            if (rotary_index < 0):
+    global Rotary_counter, LockRotary
+    LockRotary.acquire()                    # global variables locked, can only be changed by this function until released
+    NewCounter = Rotary_counter         # get counter value
+    #logging.debug("counter", NewCounter)
+    Rotary_counter = 0                      # RESET IT TO 0
+    LockRotary.release()                    # and release lock
+    if (NewCounter !=0):  #**change this to allow for more than one update at once?
+        if (NewCounter > 0):
+            rotary_index += 1
+        elif (NewCounter<0):
+            rotary_index -= 1 
+        if (rotary_index > maxIndex):
+            rotary_index = maxIndex
+            if circular == True:
                 rotary_index = 0
-                if circular == True:
-                    rotary_index = maxIndex
+        if (rotary_index < 0):
+            rotary_index = 0
+            if circular == True:
+                rotary_index = maxIndex
         return rotary_index
 
 def run_selector(trackMenu,rotary_index):
@@ -510,6 +536,7 @@ if __name__ == '__main__':
     try:
         r = redis.Redis(host=cfg.redis_signin["host"], port=cfg.redis_signin["port"],
                          password=cfg.redis_signin["password"], decode_responses=True)
+        print("redis connected")
         
     except Exception as e:
         print(e, "Trouble connecting to redis db")
@@ -521,8 +548,8 @@ if __name__ == '__main__':
 
     try:
         main()
-    except KeyboardInterrupt:
-        print ("keyboard interrupt - ending")
+    except:
+        print ("interrupt - ending")
         led_bulb("none")
         led_strip(0)
         with canvas(device) as draw:

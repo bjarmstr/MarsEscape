@@ -39,9 +39,11 @@ equip_id = 3 #Find equip_id in Equipment Table CDRA=1, WPA=2, SRA=3, OGA=4
 pipes = ('CO2','','H2', 'CH4', 'N2','H2O') #labels on display
 pipeDb = ('CO2_in','','H2_in','CH4_out','N2_in','H2O_out') #as designated in database
 pipepin = (99,99,19,21,20,26)#99 designates no pipe in this location
+CO2_LEAK_CODE = 111
 
 connectAll = 0
 pipevalue = [666,666,666,666,666,666]
+
 
 
 redpin = 6
@@ -101,7 +103,7 @@ def serial_compile():
         if '\\r\\n' in buffer_string:
             lines = buffer_string.split('\\r\\n')
             last_received = lines[-2] #last item in list is empty and second last contains latest data 
-            print(last_received,"last received")
+            #print(last_received,"last received")
             if time() < t_end:   #print pressure every 3 seconds
                 t_end = time() + 3
                 print(lines)
@@ -264,8 +266,31 @@ def running():
         if err != 0:
             print ("error")
             Status = "shutdown" 
+            if err == CO2_LEAK_CODE:
+                scenario_CO2leak()
     
     shutdown(err)
+
+def scenario_CO2leak(): 
+    global Button_pressed  
+    with canvas(device) as draw:
+        draw.rectangle(device.bounding_box, outline="black", fill="black")
+        draw.text((3, 2), "Status: ", font=size12, fill="white")
+        draw.text((20, 12), "ERROR CODE", font=size12, fill="white")
+        draw.text((25,26),"{}".format(CO2_LEAK_CODE), font=size12, fill="white")
+        draw.text((48,42),"pressure", font=size13, fill="white") 
+    while Button_pressed == 0:
+        led_bulb("none")
+        led_strip(0)
+        for i in range (10):   #number of times led flashes/2
+            if i % 2 == 0:
+                led_bulb("none")
+                dots[0] = (70,0,0)
+            else:
+                dots[0] = (0,0,0)
+                led_bulb("red")
+            sleep(.2)
+    Button_pressed = 0
             
 def shutdown(err):
     global Button_pressed
@@ -291,10 +316,11 @@ def shutdown(err):
                 led_bulb("red")
             sleep(.2)
     start = time()  #long press to shutdown pi
+    print("before button while loop")
     while GPIO.input(sbutton) == GPIO.LOW:
         sleep(0.01)
     length = time() - start
-    print (length)
+    print (length,"after while loop")
     if length > 4:
         with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="black", fill="black")
@@ -461,7 +487,7 @@ def display_main(Selector_index):
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         for i in range(len(menustr)):
-            draw.text((4, i*15+10), menustr[i][0], font=size12, fill=255) 
+            draw.text((4, i*15+6), menustr[i][0], font=size12, fill=255) 
             if( i == Selector_index):
                 invert(draw, 61, i*15+10, menustr[i][1])
                 draw.text((87,i*15+10), menustr[i][2], font=size12, fill=255)
@@ -566,7 +592,6 @@ def led_strip_lvl(colorOn):
     
     dotRemainder = lightdots - int(lightdots)
     partialdot = int (60*dotRemainder)
-    print(partialdot)
     
     dots[int(lightdots)] = (0,0,partialdot)
     
