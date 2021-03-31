@@ -7,7 +7,7 @@ from app import app
 from flask import render_template, request, flash, Response, session, redirect, url_for
 
 from app import redis_client
-from app.computations import op_data_from_db, error_codes_from_db,  isInteger
+from app.computations import op_data_from_db, error_codes_from_db,  isInteger, tester
 import json
 import time
 
@@ -67,14 +67,19 @@ def scenario():
 @app.route('/piping', methods=['GET', 'POST'])
 def piping():
     error = None
+        #is this the first time to this page and came from scenario?
     url = request.referrer
     if (url == "http://127.0.0.1:5000/scenario"):
-    #set initial time for countdown timer
+        #start tank level calculation threads
+        #reset_database
+        
+        #set initial time for countdown timer
         session['starttime']= time.time()
         if (int(session.get("scenario_time")) == 0):
             return redirect(url_for('scenario'))
         else:
             countdown = (session.get("scenario_time"))*60
+                
     else:
     #account for time elapsed since countdown started
         elapsed_time = (time.time()) - (session.get('starttime'))
@@ -89,7 +94,7 @@ def piping():
                     else:
                         print("threshold",key,value)
                         redis_client.hset("threshold",key,value)
-                print (key,":",value)
+
     
     pipe_thresh = redis_client.hgetall("threshold")   
     return render_template('piping.html', title='Piping', countdown=countdown,
@@ -105,29 +110,37 @@ def operations():
         for key, value in op_data.items():
             #validate form data
             if value: #was a value entered in the field?
-                if not isInteger(value):
+                print("value",value,type(value))
+                if isInteger(value):   
+                    if  "error" in key:
+                        dict_value = {key:value}
+                        redis_client.xadd(key,dict_value)
+                    elif (100 < int(value) <150) and "level" in key:
+                        flash('FIX Entry Error and RESUBMIT')
+                        error_input = "Valid tanks level maximum is 100% "
+                    elif (int(value) >150) or (int(value) <0):
+                        flash('FIX Entry Error and RESUBMIT')
+                        error_input = " Valid Assembly rates are between 0 & 150%" 
+                    else:
+                    #H2O example, {"H2O-level":"30"})
+                        stream = (key.split('-'))[0]
+                        dict_value = {key:value}
+                        #print(dict_value,"value for stream")
+                        #place valid data from form into database
+                        redis_client.xadd(stream,dict_value)
+                    
+                else: 
                     flash('FIX Entry Error and RESUBMIT')
                     error_input = "All values must be an integer "
-                if  "error" in key:
-                    dict_value = {key:value}
-                    redis_client.xadd(key,dict_value)
-                elif (100 < int(value) <150) and "level" in key:
-                    flash('FIX Entry Error and RESUBMIT')
-                    error_input = "Valid tanks level maximum is 100% "
-                elif (int(value) >150) or (int(value) <0):
-                    flash('FIX Entry Error and RESUBMIT')
-                    error_input = " Valid Assembly rates are between 0 & 150%" 
-                else:
-                #H2O example, {"H2O-level":"30"})
-                    stream = (key.split('-'))[0]
-                    dict_value = {key:value}
-                    print(dict_value,"value for stream")
-                    #place valid data from form into database
-                    redis_client.xadd(stream,dict_value)
-    error_code= error_codes_from_db()                
+
+                    
+                 
+    error_code= error_codes_from_db()  
+    print(error_code,"error code")              
     complete_values = op_data_from_db() #get all operations rates/levels from database           
     elapsed_time = (time.time()) - (session.get('starttime'))
     countdown = (session.get("scenario_time"))*60 - elapsed_time 
     return render_template('operations.html', title='Operations',
-                           error_code=error_code, op_valid= complete_values, countdown=countdown)
+                           error_code=error_code, op_valid= complete_values, 
+                           error = error_input, countdown=countdown)
 

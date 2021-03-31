@@ -13,7 +13,7 @@
 						let idvalue =jj[keyname];
 					console.log(idname,"name")
                		// XSS is prevented by using textContent instead of innerHTML
-                    idname.textContent= (idvalue);
+                    idname.textContent= parseInt(idvalue);
 					};
 					
                 };

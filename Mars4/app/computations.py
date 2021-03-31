@@ -6,6 +6,7 @@ Created on Feb. 3, 2021
 
 '''
 from app import redis_client
+import time
 
 def reset_threshold():
     pipes = {"WPA-H2O-pot-out","WPA-H2O-in-CO2","WPA-H2O-in-CDRA","WPA-H2O-in-SRA",
@@ -29,7 +30,7 @@ def op_data_from_db():
 
 def error_codes_from_db():
     error_codes ={}      
-    error_stream = ["CDRA-error", "WPA-error","OGA-error","SRA-error","CO2-error","H2O-error"]
+    error_stream = ["CDRA-error", "WPA-error","OGA-error","SRA-error"]
     for equip in error_stream:
         raw_data = redis_client.xrevrange(equip,"+","-",1)
         dict_info = ((raw_data[0])[1]) #locate key:value in stream
@@ -45,3 +46,11 @@ def isInteger(s):
         print("not integer")
         return False
     
+def tester():
+    time.sleep(10)  
+    print("sleep10")  
+    
+    time.sleep(5)  
+    print("sleep5") 
+    time.sleep(15)  
+    print("sleep15") 
