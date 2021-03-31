@@ -11,7 +11,7 @@ MIN_TEMP = 25
 PREHEAT_TEMP = 130
 WPA_HOLD_TIME = 10 #20seconds
 DEG_INC = 5 #5 degrees per increment
-TIME_INC = .2  #1 second delay between increments
+TIME_INC = .3  #1 second delay between increments
 #(PREHEAT_TEMP-MIN_TEMP)/DEG_INC*TIME_INC = Wait time of preheat cycle
 SRA_OGA_SYNC_TIME = 5
 
@@ -119,7 +119,6 @@ def wpa_temp_status():
         elif temp_cycle == "off":
             sleep(.3)
     
-        
 
 def wpa_preheat():
     global temp_cycle
