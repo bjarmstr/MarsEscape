@@ -8,20 +8,25 @@ import redis
 import rconfig as cfg #connection data for redis database
 
 import time
-
+import threading
 
 
 #a dict is required for a stream (a stream comes with the datestamp in the id)
 #**change rates to 0 after troubleshooting is finished
-START_RATE = {"rate" : "0"}
-START_LEVEL = {"level" : "20"}
-START_ECODE = {"error" : "0"}
-ASSEMBLY = {"CDRA","SRA","OGA","WPA",} #tank required in tank equip names (to sort rate vs level)
-TANK ={"H2Otank","CO2tank"}
-ERROR_STREAMS = {"CDRA_error", "SRA_error", "WPA_error", "OGA_error"}
+START_RATE = "100"
+START_LEVEL = "50"
+ASSEMBLY = {"CDRA","SRA","OGA","WPA"} 
+TANK ={"H2O","CO2"} 
+ERROR_STREAMS = {"CDRA-error", "SRA-error", "WPA-error", "OGA-error"}
+PIPES = {"WPA-H2O-pot-out","WPA-H2O-in-LST","WPA-H2O-in-CDRA","WPA-H2O-in-SRA",
+        "SRA-H2O-out","SRA-H2-in","SRA-CH4-out","SRA-N2-in", "SRA-CO2-in",
+        "OGA-O2-out","OGA-H2-out","OGA-H2O-pot-in",
+        "CDRA-H2O-out","CDRA-CO2-out"}
 
 error_code = 0
 RATE_CONSTANT = 3 #increase value to change level faster
+
+
 
 def main():
     try:
@@ -37,79 +42,90 @@ def main():
         
     except Exception as e:
         print(e, "Trouble connecting to redis db")
+        
+    r.flushdb()
     
     #Determine which rates/levels will be reset
     for item in ASSEMBLY:
-            start_value = START_RATE
-            reset_data(item,start_value)
-            reset_piping(item)
+        key = item + '-rate'
+        dict_rate = {key : START_RATE}
+        reset_data(item,dict_rate) #eg (CDRA,{CDRA-rate:START_RATE})
             
     for item in TANK:
-            start_value= START_LEVEL
-            reset_data(item,start_value)        
+        key = item + '-level'
+        dict_rate = {key : START_LEVEL}
+        reset_data(item,dict_rate) #eg (CO2,{CO2-level:START_LEVEL})       
         
     for item in ERROR_STREAMS:
-        start_value = START_ECODE
-        reset_data(item,start_value)
+        reset_data(item,{item:error_code})
     
-    
-        
 
-    #**for testing need rates different**
-    #reset_data("CDRA",{"rate":"100"})  
-    reset_data("WPA",{"rate":"100"})  
+    for pipe in PIPES:
+        r.hset("threshold",pipe,"10000")
+    #use the following format to change default threshold value
+    r.hset("threshold","CDRA-H2O-out","120000")   
+         
     
-    #control_level("CDRA","CDRA_error","SRA","SRA_error","CO2tank")
+    CO2thread = threading.Thread(target=control_level, )
+    H2Othread = threading.Thread(target=, )
     
-    control_level("WPA","WPA_error","OGA","OGA_error","H2Otank")
+    control_level("CDRA","CDRA-error","SRA","SRA-error","CO2")
+    
+    #control_level("WPA","WPA-error","OGA","OGA-error","H2O")
     
     
 def reset_data(stream_name, start_value):   
-    #Purge database of previous stream data and set starting rate/level
-    #Can't use flush as database holds piping and other data
-    r.xtrim(stream_name,0,False) 
     r.xadd(stream_name,start_value)
-    
-def reset_piping(equip_name):
-    piping_name = equip_name + "_pipe"
-    pipeDict = r.hgetall(piping_name) #find which pipes this equip has
-    for key in pipeDict.keys():
-        if ("threashold" not in key): #don't reset threshold values
-            r.hset(piping_name,key,"False")
     
 
 def control_level(producer_stream,producer_error, consumer_stream, 
                   consumer_error, tank_stream):
-    prev_producertime, prev_producerrate = get_stream_info(producer_stream)
-    prev_consumertime, prev_consumerrate = get_stream_info(consumer_stream)
+    _, prev_producerrate = get_stream_info(producer_stream) #use _ for unused variable
+    _, prev_consumerrate = get_stream_info(consumer_stream)
     scenario_running = True  
+    ratechange_time = time.time()
+    tank_stream_key = tank_stream + "-level"
     while scenario_running == True:
-        ratechange_time, tanklevel = get_stream_info(tank_stream)
-        if tanklevel > 100:
-            #Producer must shutdown as there is no more storage space
-            #****origonal code sent errors to both up and downstream*****
-            r.xadd(producer_error,{"producerHighLevel":"113"}) 
-        elif tanklevel < 0:
-            #Consumer must shutdown as supply has run out
-            r.xadd(consumer_error,{"consumerLowLevel":"313"}) 
-        else:
-            print("in the loop")
-            producertime, producerrate = get_stream_info(producer_stream)
-            consumertime, consumerrate = get_stream_info(consumer_stream)
-            if consumerrate != prev_consumerrate or producerrate != prev_producerrate:
-                ratechange_time = time.time() #when the rates are equal the time is not updated, reset before using in level change calculations
-            if (consumerrate-producerrate) != 0: 
+        _, tanklevel = get_stream_info(tank_stream) #db check to watch for overide from MarsControl
+        _, producerrate = get_stream_info(producer_stream)
+        _, consumerrate = get_stream_info(consumer_stream)
+        if consumerrate != prev_consumerrate or producerrate != prev_producerrate:
+            ratechange_time = time.time() #when the rates are equal the time is not updated, reset before using in level change calculations
+            if tanklevel == 100 and producerrate == 0:
+                r.xadd(producer_error,{producer_error:"0"})
+                print("reset error to 0")
+            if tanklevel == 0 and consumerrate == 0:
+                r.xadd(consumer_error,{consumer_error:"0"})
+                print("reset error to 0")
+        if (consumerrate-producerrate) != 0: 
+            if tanklevel == 100 and producerrate != 0:  #acccount for lag between tank reaching 100 and assembly shutting down
+                r.xadd(producer_error,{producer_error:"113"})
+                #print(r.xrevrange(producer_error,"+","-",1))
+                print("producer error")
+            elif tanklevel == 0 and consumerrate != 0:
+                r.xadd(consumer_error,{consumer_error:"313"}) 
+            else:
                 deltatime = (time.time() - ratechange_time)
                 print (deltatime, "time since last level update in seconds")
                 levelincrease = (producerrate - consumerrate)*RATE_CONSTANT/1000*deltatime
                 tanklevel = tanklevel + levelincrease
-                print (tanklevel, "Co2level after change")
-                dict_tanklevel = {"level" : tanklevel}
-                r.xadd(tank_stream,dict_tanklevel)  
+                if tanklevel > 100:
+                    print("producer shutdown")
+                    #Producer must shutdown as there is no more storage space
+                    r.xadd(producer_error,{producer_error:"113"}) 
+                    tanklevel = 100
+                if tanklevel < 0:
+                    #Consumer must shutdown as supply has run out
+                    r.xadd(consumer_error,{consumer_error:"313"}) 
+                    tanklevel = 0
+                dict_tanklevel = {tank_stream_key : tanklevel}
+                r.xadd(tank_stream,dict_tanklevel)
+                print("tank level to stream", dict_tanklevel)
+            
         prev_consumerrate=consumerrate
         prev_producerrate=producerrate
         #if scenario_running in db there could be a graceful stop
-        time.sleep(3) #actual time between loops is ~2.1 seconds
+        time.sleep(2) 
         
     
         
@@ -127,9 +143,6 @@ def get_stream_info(equip_stream):
     for (thevalue) in dict_info.values():  #A way to get values from key/values pairs in dict
         value = float(thevalue)
     return timestamp, value
-        
-
-    
     
 if __name__ == '__main__':
     main()
