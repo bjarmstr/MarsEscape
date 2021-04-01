@@ -13,7 +13,7 @@ WPA_HOLD_TIME = 10 #20seconds
 DEG_INC = 5 #5 degrees per increment
 TIME_INC = .3  #1 second delay between increments
 #(PREHEAT_TEMP-MIN_TEMP)/DEG_INC*TIME_INC = Wait time of preheat cycle
-SRA_OGA_SYNC_TIME = 5
+SRA_OGA_SYNC_TIME = 4
 
 hold_start_time = 0
 temp_cycle = "off"
@@ -45,6 +45,8 @@ def startup():
     global next_val
     while True:
         set_status()
+        sra_oga_dependency()
+        #wpa_temp_status() is running in a separate thread
         #tank_conditions()
         print_status()
         next_val = False
@@ -63,7 +65,6 @@ def set_status():
                             temp_cycle = "start_preheat"
                         elif temp_cycle == "cooling":
                             temp_cycle = "start_preheat"
-                    
                     if (assemblies[assembly]["error_code"] == 0):  
                         assemblies[assembly]["start_time"] = time()
                         assemblies[assembly]["rate"] = 100  
@@ -81,29 +82,64 @@ def set_status():
 def print_status():
     global next_val
     if (next_val == True):
+        completed = True
         for assembly in assemblies:
             print(assembly, "rate", assemblies[assembly]["rate"],"%",assemblies[assembly]["error_code"],"Error")
-        print("N2",assemblies["SRA"]["N2"])
+            if assemblies[assembly]["rate"] == 0:
+                completed = False
+        if completed == True:
+            print("CONGRATULATIONS!  You are now making oxygen")
+        print("N2",assemblies["SRA"]["N2"])  #light led to indicate this
         if (assemblies["WPA"]["error_code"] == 101):
             print("WPA Preheating Temp Required: 130 C, Actual: ", assemblies["WPA"]["temp"], "C")
-        if (assemblies["WPA"]["rate"] == 0) & (temp_cycle == "holding") :
+        if (assemblies["WPA"]["rate"] == 0) and (temp_cycle == "holding") :
             print("WPA preheated, ready for start-up")
         if (assemblies["SRA"]["error_code"] == 308):
             print("N2 purge required before SRA start-up")
+        if (assemblies["SRA"]["error_code"] == 534) or (assemblies["OGA"]["error_code"] == 543):
+            print("OGA/SRA must be started within ",SRA_OGA_SYNC_TIME," seconds of each other" )
+            print("H2 gas needs to be safely consumed after creation")
+            assemblies["OGA"]["error_code"] = 0
+            assemblies["SRA"]["error_code"] = 0
+        if (assemblies["SRA"]["error_code"] == 313):
+            print("No CO2 available for startup")
+            assemblies["SRA"]["error_code"]  = 0
+        if (assemblies["OGA"]["error_code"] == 414):
+            print("No potable water available for startup")
+            assemblies["OGA"]["error_code"]  = 0
+        
     next_val = False
+
 
 def pre_conditions(assembly):
     global temp_cycle
-    if (assembly == "WPA") & (assemblies["WPA"]["rate"] == 0):
+    if (assembly == "WPA") and (assemblies["WPA"]["rate"] == 0):
         if (temp_cycle != "holding"):
             assemblies[assembly]["error_code"]  = 101
         else: assemblies[assembly]["error_code"]  = 0
-    elif (assembly == "SRA") & (assemblies["SRA"]["rate"] == 0):
+    elif (assembly == "SRA") and (assemblies["SRA"]["rate"] == 0):
         if (assemblies["SRA"]["N2"]==False):
-            assemblies[assembly]["error_code"]  = 308
+            assemblies[assembly]["error_code"]  = 308   
+        elif (assemblies["CDRA"]["rate"] == 0):
+            assemblies["SRA"]["error_code"]  = 313
+    elif (assembly == "OGA") and (assemblies["WPA"]["rate"] == 0):
+        assemblies[assembly]["error_code"]  = 414
     else: assemblies[assembly]["error_code"]  = 0  #no error codes - allow startup
+    
             
-    return assemblies[assembly]["error_code"]     
+    return assemblies[assembly]["error_code"]   
+
+def sra_oga_dependency():
+    if (assemblies["SRA"]["rate"]>0) and (assemblies["OGA"]["rate"]==0):
+        if (time()-assemblies["SRA"]["start_time"]) > SRA_OGA_SYNC_TIME:
+            assemblies["SRA"]["rate"]= 0
+            assemblies["SRA"]["N2"]=False
+            assemblies["SRA"]["error_code"] = 534
+    if (assemblies["OGA"]["rate"]>0) and (assemblies["SRA"]["rate"]==0):
+        if (time()-assemblies["OGA"]["start_time"]) > SRA_OGA_SYNC_TIME:
+            assemblies["OGA"]["rate"]= 0
+            assemblies["OGA"]["error_code"] = 543
+    
 
 def wpa_temp_status():
     global temp_cycle, hold_start_time, preheating
