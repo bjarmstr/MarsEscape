@@ -61,7 +61,6 @@ def set_status():
                     if (assembly =="WPA"):  #WPA needs a preheat before starting
                         if temp_cycle == "off":
                             temp_cycle = "start_preheat"
-                            print("should be preheating")
                         elif temp_cycle == "cooling":
                             temp_cycle = "start_preheat"
                     
@@ -85,7 +84,12 @@ def print_status():
         for assembly in assemblies:
             print(assembly, "rate", assemblies[assembly]["rate"],"%",assemblies[assembly]["error_code"],"Error")
         print("N2",assemblies["SRA"]["N2"])
-        print("WPA Preheating Temp Required: 130 C, Actual: ", assemblies["WPA"]["temp"], "C")
+        if (assemblies["WPA"]["error_code"] == 101):
+            print("WPA Preheating Temp Required: 130 C, Actual: ", assemblies["WPA"]["temp"], "C")
+        if (assemblies["WPA"]["rate"] == 0) & (temp_cycle == "holding") :
+            print("WPA preheated, ready for start-up")
+        if (assemblies["SRA"]["error_code"] == 308):
+            print("N2 purge required before SRA start-up")
     next_val = False
 
 def pre_conditions(assembly):
@@ -133,12 +137,11 @@ def wpa_preheat():
 def wpa_cooling():
     global temp_cycle
     temp_cycle = "cooling"
-    print("cooling")
+    #print("cooling")
     while temp_cycle== "cooling":  
         assemblies["WPA"]["temp"] -= DEG_INC
         if (assemblies["WPA"]["temp"] <= MIN_TEMP):
             temp_cycle = "off"
-            #assemblies["WPA"]["error_code"]=0
         sleep(1)
     
     return
