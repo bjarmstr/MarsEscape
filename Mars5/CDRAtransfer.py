@@ -59,6 +59,16 @@ GPIO.output(bluepin,GPIO.HIGH) #turn off to start
 GPIO.output(redpin,GPIO.HIGH)
 GPIO.output(greenpin,GPIO.HIGH)
 
+FUSE = 24
+GPIO.setup(FUSE, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+Fuse_fixed = False
+FUSE_CODE = 107
+
+SWITCH = 16
+SWITCH_LED = 20
+GPIO.setup(SWITCH_LED, GPIO.OUT)
+GPIO.output(SWITCH_LED,GPIO.HIGH)
+
 
 Enc_A = 17              # Encoder input A: input GPIO 4 
 Enc_B = 18                      # Encoder input B: input GPIO 14
@@ -150,9 +160,19 @@ def main():
     led_bulb("none")
     GPIO.setup(sbutton,GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.add_event_detect(sbutton, GPIO.FALLING, callback=sbutton_interrupt, bouncetime=400)
+    GPIO.setup(SWITCH, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.add_event_detect(SWITCH, GPIO.BOTH, callback=pwr_detect, bouncetime=500)
     first_startup = True
     boot_message() #initialize serial
     init_database()
+    with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="black", fill="black")
+    while GPIO.input(SWITCH) == False:      #waiting for external power 
+        sleep(1)
+        print("waiting for power switch") 
+    GPIO.output(SWITCH_LED,GPIO.LOW) 
+     
+    
     while True:
         startup(first_startup)
         
@@ -282,7 +302,7 @@ def running():
     first = True
     trackMenu = 0
     #when start button pressed -rate changed to 100 in database and CDRArate
-   #inputs = (3,"rate", 100, datetime.now())
+    #inputs = (3,"rate", 100, datetime.now())
     #insert_op_parm(inputs,db,c)
     dict_rate = {"CDRA-rate":"100"}
     r.xadd("CDRA",dict_rate)
@@ -307,6 +327,10 @@ def running():
                 scenario_CO2_leak()
                 Status = "running"
                 CDRArate = get_redis("CDRA")  #
+            if err == FUSE_CODE:
+                scenario_fuse_blown()
+                Status = "running"
+                
     
     shutdown(err)
 
@@ -395,7 +419,23 @@ def scenario_CO2_leak():
     Button_pressed = 0
     test_leak_Arduino = False  
      
-           
+def scenario_fuse_blown():
+    global CDRArate
+    led_bulb("none")
+    led_strip(0)
+    with canvas(device) as draw:
+        draw.rectangle(device.bounding_box, outline="black", fill="black")
+    CDRArate = 0
+    dict_rate = {"CDRA-rate":"0"}
+    r.xadd("CDRA",dict_rate)
+    err = get_redis("CDRA-error")
+    while GPIO.input(FUSE) == False or err == 117:      #fuse needs replacement 
+        print("waiting for fuse to be fixed")
+        err = get_redis("CDRA-error")
+        sleep(1)
+    r.xadd("CDRA-error",{"CDRA-error":"0"})
+    print("fuse fixed")
+            
             
 def shutdown(err):
     global Button_pressed, Selector_counter
@@ -469,6 +509,27 @@ def shutdown(err):
 
     Button_pressed = 0  #back to main function
     print(Status,"status, bottom of shutdown")
+
+def pwr_detect(_pin):
+    sleep(.5)
+    if GPIO.input(SWITCH):
+        print("power on")
+        GPIO.output(SWITCH_LED,GPIO.LOW)
+        
+    else:
+        print("power switch off")
+        GPIO.output(SWITCH_LED,GPIO.HIGH)
+        
+def fuse_detect(_pin):
+    global Fuse_fixed
+    sleep(.2)
+    if GPIO.input(FUSE):
+        print("fuse is fixed")
+        Fuse_fixed = True
+    else:
+        print("fuse still needs replacement")
+        Fuse_fixed = False
+    
             
 def selector_status(maxIndex,circular):
     global Selector_counter, LockSelector, Selector_index
