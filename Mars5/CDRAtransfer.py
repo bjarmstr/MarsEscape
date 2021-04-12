@@ -253,7 +253,7 @@ def startup(first_start):
             draw.rectangle(device.bounding_box, outline="white", fill="black")
             draw.text((3, 2), "Status:  ", font=size15, fill="white")
             draw.text((6, 33), "Communication Error ", font=size12, fill="white")
-            draw.text((6, 33), "Rebooting ", font=size12, fill="white")
+            draw.text((6, 43), "Rebooting ", font=size12, fill="white")
         sleep(3)
     if (arduino_connect == False):
         ser.close()
@@ -752,31 +752,34 @@ def led_bulb(color):
         GPIO.output(bluepin,GPIO.HIGH)
  
 
-def led_strip(colorOn):
-   
-   #if colorOn == 0:
+def led_strip(colorOn): 
     for dot in range(8):
         dots[dot] = (0,0,0)
     if colorOn <= 100:
-        lightdots = colorOn/20
-        for dot in range(int(lightdots)):
+        lightdot = colorOn/12.5
+        lightdot_int = int(lightdot)
+        dotRemainder = lightdot - lightdot_int
+        partialdot = int (80*dotRemainder)
+        for dot in range(lightdot_int):
+            print(dot, "out of", lightdot_int)
             dots[dot] = (0,80,0)
-    elif (colorOn >100) and (colorOn <=200):
-        lightdot = (colorOn-100)/16.7  #rate >100
-        dotRemainder = lightdot - int(lightdot)
+        print(partialdot, "partialdot")
+        if lightdot_int < 8:
+            dots[lightdot_int] = (0,partialdot,0)
+            
+    elif (colorOn >100) and (colorOn <=150):
+        lightdot = (colorOn-100)/12.5  #rate >100
+        lightdot_int = int(lightdot)
+        dotRemainder = lightdot - lightdot_int
         partialdot = int (80*dotRemainder)
         print(partialdot)
-        for dot in range(5):
-            dots[dot] = (50,50,0)
-        if lightdot < 1:
-            dots[5] = (partialdot,0,0)
-        else:
-            dots[5] =(80,0,0)
-            if lightdot <2:
-                dots[6] = (partialdot,0,0)
-            else:
-                dots[6]=(80,0,0)
-                dots[7] = (partialdot,0,0)
+        for dot in range(4):
+            dots[dot] = (0,80,0)
+        for dot in range(4, lightdot_int+4):
+            dots[dot] = (80,0,0)    
+        if lightdot_int < 4:
+            dots[lightdot_int + 4] = (partialdot,0,0)   
+ 
 
 def led_strip_lvl(colorOn):
     lightdots = colorOn/12.5
