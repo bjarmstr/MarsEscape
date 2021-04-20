@@ -13,8 +13,8 @@ import threading
 
 #a dict is required for a stream (a stream comes with the datestamp in the id)
 #**change rates to 0 after troubleshooting is finished
-START_RATE = "100"
-START_LEVEL = "50"
+START_RATE = "0"
+START_LEVEL = "0"
 ASSEMBLY = {"CDRA","SRA","OGA","WPA"} 
 TANK ={"H2O","CO2"} 
 ERROR_STREAMS = {"CDRA-error", "SRA-error", "WPA-error", "OGA-error"}
@@ -66,17 +66,69 @@ def main():
     r.hset("threshold","CDRA-H2O-out","120000")   
          
     
-    CO2thread = threading.Thread(target=control_level, )
-    H2Othread = threading.Thread(target=, )
+    CO2thread = threading.Thread(target=control_level, args=("CDRA","CDRA-error","SRA","SRA-error","CO2"), daemon= True)
+    H2Othread = threading.Thread(target=control_level1, args=("WPA","WPA-error","OGA","OGA-error","H2O"), daemon= True)
     
-    control_level("CDRA","CDRA-error","SRA","SRA-error","CO2")
+    #CO2thread.start()
+    H2Othread.start()
+   # control_CO2("CDRA","CDRA-error","SRA","SRA-error","CO2")
     
-    #control_level("WPA","WPA-error","OGA","OGA-error","H2O")
+   # control_H2O("WPA","WPA-error","OGA","OGA-error","H2O")
     
     
 def reset_data(stream_name, start_value):   
     r.xadd(stream_name,start_value)
     
+
+def control_level1(producer_stream,producer_error, consumer_stream, 
+                  consumer_error, tank_stream):
+    _, prev_producerrate = get_stream_info1(producer_stream) #use _ for unused variable
+    _, prev_consumerrate = get_stream_info1(consumer_stream)
+    scenario_running = True  
+    ratechange_time = time.time()
+    tank_stream_key = tank_stream + "-level"
+    while scenario_running == True:
+        _, tanklevel = get_stream_info1(tank_stream) #db check to watch for overide from MarsControl
+        _, producerrate = get_stream_info1(producer_stream)
+        _, consumerrate = get_stream_info1(consumer_stream)
+        if consumerrate != prev_consumerrate or producerrate != prev_producerrate:
+            ratechange_time = time.time() #when the rates are equal the time is not updated, reset before using in level change calculations
+            if tanklevel == 100 and producerrate == 0:
+                r.xadd(producer_error,{producer_error:"0"})
+                print("reset error to 0")
+            if tanklevel == 0 and consumerrate == 0:
+                r.xadd(consumer_error,{consumer_error:"0"})
+                print("reset error to 0")
+        if (consumerrate-producerrate) != 0: 
+            if tanklevel == 100 and producerrate != 0:  #acccount for lag between tank reaching 100 and assembly shutting down
+                r.xadd(producer_error,{producer_error:"113"})
+                #print(r.xrevrange(producer_error,"+","-",1))
+                print("producer error")
+            elif tanklevel == 0 and consumerrate != 0:
+                r.xadd(consumer_error,{consumer_error:"313"}) 
+            else:
+                deltatime = (time.time() - ratechange_time)
+                print (deltatime, "time since last level update in seconds")
+                levelincrease = (producerrate - consumerrate)*RATE_CONSTANT/1000*deltatime
+                tanklevel = tanklevel + levelincrease
+                if tanklevel > 100:
+                    print("producer shutdown")
+                    #Producer must shutdown as there is no more storage space
+                    r.xadd(producer_error,{producer_error:"113"}) 
+                    tanklevel = 100
+                if tanklevel < 0:
+                    #Consumer must shutdown as supply has run out
+                    r.xadd(consumer_error,{consumer_error:"313"}) 
+                    tanklevel = 0
+                dict_tanklevel = {tank_stream_key : tanklevel}
+                r.xadd(tank_stream,dict_tanklevel)
+                print("tank level to stream", dict_tanklevel)
+            
+        prev_consumerrate=consumerrate
+        prev_producerrate=producerrate
+        #if scenario_running in db there could be a graceful stop
+        time.sleep(2) 
+
 
 def control_level(producer_stream,producer_error, consumer_stream, 
                   consumer_error, tank_stream):
@@ -127,7 +179,20 @@ def control_level(producer_stream,producer_error, consumer_stream,
         #if scenario_running in db there could be a graceful stop
         time.sleep(2) 
         
-    
+def get_stream_info1(equip_stream):
+    #Finds the newest rate/level from the stream and the time it was recorded
+    #Redis stream id's starts with time from Unix Epoch
+    #value is stored as the value in a dictionary datatype
+    raw_data = r.xrevrange(equip_stream,"+","-",1)
+    #print(raw_data,"this is the raw format of the stream data")
+    extract_id = ((raw_data[0])[0]) 
+    endof_timestamp=extract_id.find("-")
+    timestamp_offby3 = int(extract_id[0:(endof_timestamp)]) 
+    timestamp = timestamp_offby3/1000 #decimal point is 3 digits from end of redis timestamp id
+    dict_info = ((raw_data[0])[1])
+    for (thevalue) in dict_info.values():  #A way to get values from key/values pairs in dict
+        value = float(thevalue)
+    return timestamp, value    
         
 def get_stream_info(equip_stream):
     #Finds the newest rate/level from the stream and the time it was recorded

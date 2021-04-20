@@ -33,13 +33,14 @@ size13 = ImageFont.truetype("/home/pi/MarsOne/FreePixel.ttf", 13)
 size12 = ImageFont.truetype("/home/pi/MarsOne/FreePixel.ttf", 12)
 
 GPIO.setmode(GPIO.BCM)
-
-#lspin = 18 #raspberry pi digital pin number that light sensor is wired to
 equip_id = 3 #Find equip_id in Equipment Table CDRA=1, WPA=2, SRA=3, OGA=4
 pipes = ('CO2','','H2', 'CH4', 'N2','H2O') #labels on display
-pipeDb = ('CO2_in','','H2_in','CH4_out','N2_in','H2O_out') #as designated in database
+pipeDb = ('CO2-in','','H2-in','CH4-out','N2-in','H2O-out') #as designated in database
 pipepin = (99,99,19,21,20,26)#99 designates no pipe in this location
-CO2_LEAK_CODE = 111
+
+#Error Codes as defined in marscontrol.py
+LOCAL_ERROR_CODES = [100, 308, 313, 113, 534]
+
 
 connectAll = 0
 pipevalue = [666,666,666,666,666,666]
@@ -70,7 +71,7 @@ Current_B = 1                   # moving while we init software
 LockSelector = threading.Lock()       # create lock for rotary switch
 
 Button_pressed = 0        #initialize global variables
-N2purge_button = 0
+N2_purge = 0
 Selector_index = 0
 SRArateprev = 0
 SRArate = 0
@@ -104,9 +105,6 @@ def serial_compile():
             lines = buffer_string.split('\\r\\n')
             last_received = lines[-2] #last item in list is empty and second last contains latest data 
             #print(last_received,"last received")
-            if time() < t_end:   #print pressure every 3 seconds
-                t_end = time() + 3
-                print(lines)
             if "Left" in last_received:
                 Selector_counter = Selector_counter +1
                 print("down")
@@ -122,13 +120,18 @@ def serial_compile():
         
         sleep(.03)
 
-def sbutton_interrupt(pinNum):   #pinNum never used
+def sbutton_interrupt(_pinNum):   #pinNum never used
     global Button_pressed
     Button_pressed = 1
     
-def nbutton_interrupt(pinNum):   #pinNum never used
-    global N2purge_button
-    N2purge_button = 1
+def nbutton_interrupt(_pinNum):   #pinNum never used
+    global N2_purge, Status
+    N2_purge = 1
+    if Status == "startup":
+        r.xadd("SRA-purge",{"SRA-purge":"1"})
+        print("N2purge button - ready for startup")
+    #can't purge while unit is running only in startup mode
+    #reset purge to 0 when restarting startup
     print("N2purge button")
 
 def selector_interrupt():
@@ -188,21 +191,24 @@ def init_database():
             
 def startup(first_start):
     global connectAll, Button_pressed, Status
+    Status = "startup" 
     Button_pressed = 0
+    if N2_purge == 1: 
+        led_bulb("blue")
+        print("blub starting blue - N2 purged")
+    else: 
+        led_bulb("yellow")
+        print("blub starting yellow")
     #connectAll = 0
     piped = [0] * 6
-    print("top of startup")
+    #print("top of startup")
     while connectAll < 6:
-        led_bulb("blue")
         for i in range(6):       #there are 6 squares that could have piping
-            
             if pipepin[i] != 99: #if a pipe exists in this square
                 pipe_key = "SRA-" + pipeDb[i]
-                #threshold = int(r.hget("threshold",pipe_key))
-                threshold = int(r.hget("threshold", "SRA-H2O-out"))
+                threshold = int(r.hget("threshold",pipe_key))
                 pipestat = get_light (pipepin[i],threshold)  #check if pipe is connected  this takes time       
                 pipevalue[i] = pipestat[0]
-                #sudisplay(piped,pipevalue) #remove after troubleshooting
                 if piped[i] != pipestat[1]: #there is a change            
                     if pipestat[1] == 0:
                         piped[i] = 0
@@ -216,9 +222,7 @@ def startup(first_start):
                 
             #print (connectAll, "connectAll", piped)
         connectAll = sum (piped)
-        
-    Status = "ready" #once piping is correct, it is not checked again
-    led_bulb("none")
+
     print ("piping is connected, ready for startup, waiting for button press")
     sleep(3)
     with canvas(device) as draw:
@@ -230,7 +234,6 @@ def startup(first_start):
         if first_start == True:
             init()
         first_start = False
-        Status = "startup"
         running()
         
             
@@ -247,63 +250,45 @@ def running():
     #when start button pressed -rate changed to 100 in database and SRArate
    #inputs = (3,"rate", 100, datetime.now())
     #insert_op_parm(inputs,db,c)
-    dict_rate = {"SRA-rate":"100"}
-    r.xadd("SRA",dict_rate)
+    r.xadd("SRA",{"SRA-rate":"100"})
     SRArate = 100
     SRArateprev = 100
     led_strip(SRArate)
 
     
     while Status == "running":
-        #inputs = ("13", "level") #CO2 tank id 13
-        #CO2level,timestamp = query_op_parm(inputs,c)
-        CO2level = get_redis("CO2")
-        sleep(.05)
-        run_selector()
-        #inputs = (equip_id, "error")
-        #err,timestamp = query_op_parm(inputs,c) #check db, change of conditions in external equipment (eg. power from teg), or override added from escape room supervisor 
         err = get_redis("SRA-error")
         if err != 0:
             print ("error")
             Status = "shutdown" 
-            if err == CO2_LEAK_CODE:
-                scenario_CO2leak()
+        CO2level = get_redis("CO2")
+        sleep(.05)
+        run_selector() 
     
     shutdown(err)
 
-def scenario_CO2leak(): 
-    global Button_pressed  
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="black", fill="black")
-        draw.text((3, 2), "Status: ", font=size12, fill="white")
-        draw.text((20, 12), "ERROR CODE", font=size12, fill="white")
-        draw.text((25,26),"{}".format(CO2_LEAK_CODE), font=size12, fill="white")
-        draw.text((48,42),"pressure", font=size13, fill="white") 
-    while Button_pressed == 0:
-        led_bulb("none")
-        led_strip(0)
-        for i in range (10):   #number of times led flashes/2
-            if i % 2 == 0:
-                led_bulb("none")
-                dots[0] = (70,0,0)
-            else:
-                dots[0] = (0,0,0)
-                led_bulb("red")
-            sleep(.2)
-    Button_pressed = 0
             
 def shutdown(err):
-    global Button_pressed
+    global Button_pressed, N2_purge
     print ("top of shutdown, finished running", err)
     r.xadd(("SRA"),{"SRA-rate":"0"}) #tell the db that SRA has shutdown ** this was not in origonal code
+    r.xadd("SRA-purge",{"SRA-purge":"0"})
+    N2_purge = 0
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
         draw.text((3, 2), "Status: ", font=size12, fill="white")
         draw.text((20, 12), "Shutting Down", font=size12, fill="white")
-        if err != 100:
-            err = int(err)
-            draw.text((25,26),"ERROR CODE", font=size12, fill="white")
-            draw.text((48,42),"{}".format(err), font=size13, fill="white") 
+        if err == 100:
+             draw.text((22, 25), "Press Select", font=size12, fill="white")
+             draw.text((24, 36), "to return", font=size12, fill="white")
+             draw.text((8, 47), "to Startup Menu", font=size12, fill="white")
+        else:    
+            draw.text((25,26),"ERROR CODE", font=size13, fill="white")
+            draw.text((48,39),"{}".format(err), font=size13, fill="white") 
+            draw.text((3,52),"Fix then Press Start", font=size12, fill="white") 
+    if err in LOCAL_ERROR_CODES : #reset error to 0
+        r.xadd("SRA-error",{"SRA-error":"0"})
+        err = 0
     while Button_pressed == 0:
         led_bulb("none")
         led_strip(0)
@@ -327,14 +312,6 @@ def shutdown(err):
             draw.text((7, 5), "Turn off Power", font=size14, fill="white")
             draw.text((11, 30), "to Restart ", font=size14, fill="white")
         subprocess.call(["shutdown", "-h", "now"])  
-    if err ==100: #reset error to 0
-        #inputs = (equip_id,"error",0,datetime.now())
-        #insert_op_parm(inputs,db,c)
-        r.xadd("SRA-error",{"SRA-error":"0"})
-        err = 0
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="black", fill="black")
-        draw.text((7, 5), "IN SHUTDOWN FUNCTIONS", font=size14, fill="white")
 
     Button_pressed = 0  #back to main function
     print(Status,"status, bottom of shutdown")
@@ -422,8 +399,7 @@ def run_selector():
             first = True
             #inputs = (3,"rate", SRArate, datetime.now())
             #insert_op_parm(inputs,db,c)
-            dict_rate = {"SRA-rate":SRArate}
-            r.xadd("SRA",dict_rate)
+            r.xadd("SRA",{"SRA-rate":SRArate})
              
     elif (Menu_index == 3):
         display_tank()
@@ -526,27 +502,26 @@ def display_tank():
         draw.text((7, 3), 'CO2 Tank Level ', font=size13, fill=255)
         #inputs = ("13", "level") #CO2 tank id 13
         #CO2level,TimeT = query_op_parm(inputs,c)
-        CO2level = get_redis("H2O")
+        CO2level = get_redis("CO2")
         led_strip_lvl(int(CO2level))
-        #inputs = ("2", "rate") 
-        #strWPArate,TimeT = query_op_parm(inputs,c)
-        #******************change to CO2 **********************
-        WPArate = get_redis("WPA")
+        CDRArate = get_redis("CDRA")
        # WPArate = int(strWPArate)
-        if (WPArate - SRArate) == 0:
+        if (CDRArate - SRArate) == 0:
             direction = "stable"
-        elif (WPArate - SRArate)< 0:
+        elif (CDRArate - SRArate)< 0:
             direction = "increasing"
         else:
             direction = "decreasing"
         draw.text((30, 13), "{}% Full".format(int(CO2level)), font=size14, fill=255)
         draw.text((3,30),  "CO2 level {}.".format(direction), font=sizet, fill=255)
         if direction != "stable":
-            draw.text((3,40),  "If WPArate=SRArate,", font=sizet, fill=255)
+            draw.text((3,40),  "If CDRArate=SRArate,", font=sizet, fill=255)
             draw.text((3,50), "level will stabilize.",font=sizet, fill=255)
+            
+        
         
 def led_bulb(color):
-    if color!= "none":
+    if color!= "none" and color!="yellow":
         GPIO.output((pindict[color]),GPIO.LOW)
     if color != "red":
         GPIO.output(redpin,GPIO.HIGH)
@@ -554,33 +529,38 @@ def led_bulb(color):
         GPIO.output(greenpin,GPIO.HIGH)
     if color != "blue":
         GPIO.output(bluepin,GPIO.HIGH)
+    if color == "yellow":
+        GPIO.output(redpin,GPIO.LOW)
+        GPIO.output(greenpin,GPIO.LOW)
  
 
-def led_strip(colorOn):
-   
-   #if colorOn == 0:
+def led_strip(colorOn): 
     for dot in range(8):
         dots[dot] = (0,0,0)
     if colorOn <= 100:
-        lightdots = colorOn/20
-        for dot in range(int(lightdots)):
+        lightdot = colorOn/12.5
+        lightdot_int = int(lightdot)
+        dotRemainder = lightdot - lightdot_int
+        partialdot = int (80*dotRemainder)
+        for dot in range(lightdot_int):
+            print(dot, "out of", lightdot_int)
             dots[dot] = (0,80,0)
-    elif (colorOn >100) and (colorOn <=200):
-        lightdot = (colorOn-100)/16.7  #rate >100
-        dotRemainder = lightdot - int(lightdot)
+        print(partialdot, "partialdot")
+        if lightdot_int < 8:
+            dots[lightdot_int] = (0,partialdot,0)
+            
+    elif (colorOn >100) and (colorOn <=150):
+        lightdot = (colorOn-100)/12.5  #rate >100
+        lightdot_int = int(lightdot)
+        dotRemainder = lightdot - lightdot_int
         partialdot = int (80*dotRemainder)
         print(partialdot)
-        for dot in range(5):
-            dots[dot] = (50,50,0)
-        if lightdot < 1:
-            dots[5] = (partialdot,0,0)
-        else:
-            dots[5] =(80,0,0)
-            if lightdot <2:
-                dots[6] = (partialdot,0,0)
-            else:
-                dots[6]=(80,0,0)
-                dots[7] = (partialdot,0,0)
+        for dot in range(4):
+            dots[dot] = (0,80,0)
+        for dot in range(4, lightdot_int+4):
+            dots[dot] = (80,0,0)    
+        if lightdot_int < 4:
+            dots[lightdot_int + 4] = (partialdot,0,0)  
 
 def led_strip_lvl(colorOn):
     lightdots = colorOn/12.5
@@ -597,11 +577,9 @@ def led_strip_lvl(colorOn):
     
 def get_redis(equip_stream):
     raw_data = r.xrevrange(equip_stream,"+","-",1)
-    print(raw_data, "raw data")
     dict_info=((raw_data[0][1]))
-    print(dict_info)
     for (thevalue) in dict_info.values():
-        valueX = float(thevalue)
+        valueX = float(thevalue) #going to integer here was putting errors
         value = int(valueX)
     return value
 

@@ -10,13 +10,31 @@ import rconfig as cfg #connection data for redis database
 import threading
 from time import sleep, time
 
+
+#a dict is required for a stream (a stream comes with the datestamp in the id)
+
+
+ASSEMBLIES = {"CDRA","SRA","OGA","WPA"} 
+
+PIPES = {"WPA-H2O-pot-out","WPA-H2O-in-LST","WPA-H2O-in-CDRA","WPA-H2O-in-SRA",
+        "SRA-H2O-out","SRA-H2-in","SRA-CH4-out","SRA-N2-in", "SRA-CO2-in",
+        "OGA-O2-out","OGA-H2-out","OGA-H2O-pot-in",
+        "CDRA-H2O-out","CDRA-CO2-out"}
+
+RATE_CONSTANT = 3 #increase value to change level faster
+
+
+
 MIN_TEMP = 25
 PREHEAT_TEMP = 130
-WPA_HOLD_TIME = 10 #20seconds
+WPA_HOLD_TIME = 15 #seconds
 DEG_INC = 5 #5 degrees per increment
 TIME_INC = .1  #1 second delay between increments
 #(PREHEAT_TEMP-MIN_TEMP)/DEG_INC*TIME_INC = Wait time of preheat cycle
-SRA_OGA_SYNC_TIME = 4 #seconds
+SRA_OGA_SYNC_TIME = 6 #seconds
+
+ERR = {"CO2_high_level": 113, "WPA_preheat": 201, "H2O_high_level":214, "SRA_purge": 308, "CO2_low_level":313,
+       "H2O_low_level":414, "OGA_not_ready":534, "SRA_not_ready":543}
 
 
 sync_start = 0
@@ -29,29 +47,48 @@ preheating = True
 user_str = ""
 next_val = False
 
+prev_rate = { "CDRA" : 0 ,"OGA" : 0 , "SRA" : 0 , "WPA" : 0 }
+
+
 
 temp_cycle = "off"   #values: off, preheat or cooling
 
 
-assemblies = {"CDRA","SRA","OGA","WPA"}
-
-
 def main():
+
+    r.flushdb()
+    
+    for assembly in ASSEMBLIES:
+        xadd_redis(assembly,"rate",0)
+        xadd_redis(assembly,"error",0)
+    
+    xadd_redis("SRA","purge",0)
+    xadd_redis("WPA","preheat",MIN_TEMP)
+    xadd_redis("CO2", "level",0)
+    xadd_redis("H2O", "level", 0)
+
+    for pipe in PIPES:
+        r.hset("threshold",pipe,"10000")
+    #use the following format to change default threshold value
+    r.hset("threshold","CDRA-H2O-out","120000")
+    #r.hset("threshold","SRA-H2O-out","120000")
+    r.hset("threshold","SRA-H2-in","120000")
+    r.hset("threshold","SRA-N2-in","120000")
+    r.hset("threshold","SRA-CH4-out","140000")
+         
+    
+    CO2thread = threading.Thread(target=control_level_CO2, args=("CDRA","CDRA-error","SRA","SRA-error","CO2"), daemon= True)
+    H2Othread = threading.Thread(target=control_level_H2O, args=("WPA","WPA-error","OGA","OGA-error","H2O"), daemon= True)
+    CO2thread.start()
+    H2Othread.start()
+    
     wpa_temp_status_thread = threading.Thread(target=wpa_temp_status, daemon=True)
     wpa_temp_status_thread.start()
     
     user_thread = threading.Thread(target=user_input, daemon=True)
     user_thread.start()
-    xadd_redis("SRA","error",0)
-    xadd_redis("OGA","error",0)
-    xadd_redis("WPA","error",0)
-    xadd_redis("CDRA","error",0)
-    xadd_redis("SRA","purge",0)
-    xadd_redis("WPA","preheat",MIN_TEMP)
-    xadd_redis("SRA","rate",0)
-    xadd_redis("OGA","rate",0)
-    xadd_redis("WPA","rate",0)
-    xadd_redis("CDRA","rate",0)
+    
+
     startup()
 
 
@@ -72,47 +109,61 @@ def startup():
     global next_val
     while True:
         set_status()
-        sra_oga_dependency()
         #wpa_temp_status() is running in a separate thread
-        #tank_conditions()
-        print_status()
-        next_val = False
+        #tank_conditions() running in separate thread
+        #print_status()
+        
+        #next_val = False
         sleep(.3)
 
 
 def set_status():
-    global user_str,next_val, temp_cycle, sync_start
-    if (next_val == True):
-        for assembly in assemblies:
-            if assembly in user_str: #if we try to start this box
-                if (get_redis(assembly) == 0):  #make sure it is not already started
-                    err_code = pre_conditions(assembly)
-                    xadd_redis(assembly,"error", err_code)
-                    if (assembly =="WPA"):  #WPA needs a preheat before starting
-                        if temp_cycle == "off":
-                            temp_cycle = "start_preheat"
-                        elif temp_cycle == "cooling":
-                            temp_cycle = "start_preheat" 
-                    if (err_code == 0):
-                        #start-up unit
-                        if assembly == "SRA":
-                            SRA_start = time()
-                            sync_start = time()
-                            print("sync_start SRA", sync_start)
-                        if assembly == "OGA":
-                            OGA_start = time()  
-                            sync_start = time()
-                            print("start timer - OGA")
-                        xadd_redis(assembly,"rate", 100)
-                    
-        if "N2" in user_str:  #SRA needs N2 purge before starting
-            err_code = get_redis("SRA-error")
-            if err_code == 308:
-                xadd_redis("SRA","error", 0)
-            print(get_redis("SRA-purge"))
-            if get_redis("SRA") == 0:
-                xadd_redis("SRA","purge", 1)
-            else: print("SRA lines can't be purged while it is running")
+    global user_str,next_val, temp_cycle, sync_start, prev_rate
+    for assembly in ASSEMBLIES:
+        new_rate = get_redis(assembly)
+        if assembly == "SRA": SRA_rate  = new_rate
+        if assembly == "OGA": OGA_rate  = new_rate
+        if prev_rate[assembly] == 0 and new_rate != 0: #if we try to start this box
+            xadd_redis(assembly,"rate", 0) #set rate back to zero while determining if conditions are met
+            if assembly == "SRA": SRA_rate  = 0
+            if assembly == "OGA": OGA_rate  = 0
+            
+            err_code = pre_conditions(assembly)
+            xadd_redis(assembly,"error", err_code)
+            if (assembly =="WPA"):  #WPA needs a preheat before starting
+                print("wpa")
+                if temp_cycle == "off":
+                    temp_cycle = "start_preheat"
+                elif temp_cycle == "cooling":
+                    temp_cycle = "start_preheat" 
+            if (err_code == 0):
+                #start-up unit
+                print(assembly, " starting up")
+                if assembly == "SRA":
+                    sync_start = time()
+                    print("sra starting sync timing")
+                if assembly == "OGA": 
+                    sync_start = time()
+                    print("oga starting sync timing")
+                  #no change
+                xadd_redis(assembly,"rate", new_rate)
+            else:
+                print(assembly,"failed conditions for rate change")
+                  #failed conditions for rate change  -- can remove this after troubleshooting
+        prev_rate[assembly] = new_rate                    
+    #oga/sra dependency
+    if (SRA_rate > 0) and (OGA_rate == 0):
+        if (time()-sync_start) > SRA_OGA_SYNC_TIME: 
+            print("sra/oga", time(), sync_start, time()-sync_start, prev_rate["SRA"])
+            xadd_redis("SRA","rate", 0)
+            xadd_redis("SRA","purge", 0)
+            xadd_redis("SRA","error", ERR["OGA_not_ready"])
+    if OGA_rate > 0  and SRA_rate == 0:
+        if (time()-sync_start) > SRA_OGA_SYNC_TIME:
+            xadd_redis("OGA","rate", 0) 
+            xadd_redis("OGA","error", ERR["SRA_not_ready"])
+        
+
 
             
         
@@ -120,29 +171,28 @@ def print_status():
     global next_val
     if (next_val == True):
         completed = True
-        for assembly in assemblies:
+        for assembly in ASSEMBLIES:
             print(assembly, "rate", get_redis(assembly),"%",get_redis(assembly+"-error"),"Error")
             if get_redis(assembly) == 0:
                 completed = False
         if completed == True:
             print("CONGRATULATIONS!  You are now making oxygen")
         print("N2",get_redis("SRA-purge"))  #light led to indicate this
-        if (get_redis("WPA-error") == 101):
+        if (get_redis("WPA-error") == ERR["WPA_preheat"]):
             print("WPA Preheating Temp Required: 130 C, Actual: ", get_redis("WPA-preheat"), "C")
         if (get_redis("WPA") == 0) and (temp_cycle == "holding") :
             print("WPA preheated, ready for start-up")
-        if (get_redis("SRA-error") == 308):
+        if (get_redis("SRA-error") == ERR["SRA_purge"]):
             print("N2 purge required before SRA start-up")
-        if (get_redis("SRA-error") == 534) or (get_redis("OGA-error") == 543):
+        if (get_redis("SRA-error") == ERR["OGA_not_ready"]) or (get_redis("OGA-error") == ERR["SRA_not_ready"]):
             print("OGA/SRA must be started within ",SRA_OGA_SYNC_TIME," seconds of each other" )
             print("H2 gas needs to be safely consumed after creation")
             xadd_redis("OGA","error",0)
             xadd_redis("SRA","error",0)
-        if get_redis("SRA-error") == 313:
+        if get_redis("SRA-error") == ERR["CO2_low_level"]:
             print("No CO2 available for startup")
             xadd_redis("SRA","error",0)
-            
-        if get_redis("OGA-error") == 414:
+        if get_redis("OGA-error") == ERR["H2O_low_level"]:
             print("No potable water available for startup")
             xadd_redis("OGA","error",0)
         
@@ -153,17 +203,11 @@ def pre_conditions(assembly):
     global temp_cycle
     if (assembly == "WPA") and (get_redis("WPA") == 0):
         if (temp_cycle != "holding"):
-            xadd_redis(assembly,"error", 101)
+            xadd_redis(assembly,"error", ERR["WPA_preheat"])
         else: xadd_redis(assembly,"error", 0)
-    elif (assembly == "SRA") and (get_redis("SRA") == 0):  
+    elif (assembly == "SRA"):  
         if (get_redis("SRA-purge")== 0):
-            xadd_redis(assembly,"error", 308)  
-        elif (get_redis("CDRA") == 0):
-            ##build for level changes
-            xadd_redis(assembly,"error", 313)
-    elif (assembly == "OGA") and (get_redis("WPA") == 0):
-        ##build for level changes
-        xadd_redis(assembly,"error", 414)
+            xadd_redis(assembly,"error", ERR["SRA_purge"])  
     else: xadd_redis(assembly,"error", 0)           
     err_code = get_redis(assembly+"-error")
     return err_code   
@@ -173,14 +217,14 @@ def sra_oga_dependency():
     if (get_redis("SRA")>0) and (get_redis("OGA")==0):
         if (time()-sync_start) > SRA_OGA_SYNC_TIME:
             
-            print("sra/oga", time(), sync_start, time()-sync_start)
+            print("sra/oga", time(), sync_start, time()-sync_start, prev_rate["SRA"])
             xadd_redis("SRA","rate", 0)
             xadd_redis("SRA","purge", 0)
-            xadd_redis("SRA","error", 534)
+            xadd_redis("SRA","error", ERR["OGA_not_ready"])
     if (get_redis("OGA")>0) and (get_redis("SRA")==0):
         if (time()-sync_start) > SRA_OGA_SYNC_TIME:
             xadd_redis("OGA","rate", 0) 
-            xadd_redis("OGA","error", 543)
+            xadd_redis("OGA","error", ERR["SRA_not_ready"])
 
 def wpa_temp_status():
     global temp_cycle, hold_start_time, preheating
@@ -223,11 +267,144 @@ def wpa_cooling():
         if (temperature <= MIN_TEMP):
             temp_cycle = "off"
         sleep(1)   
-    return 
+    return
+
+def control_level_CO2(producer_stream,producer_error, consumer_stream, 
+                  consumer_error, tank_stream):
+    _, prev_producerrate = get_stream_CO2(producer_stream) #use _ for unused variable
+    _, prev_consumerrate = get_stream_CO2(consumer_stream)
+    scenario_running = True  
+    ratechange_time = time()
+    tank_stream_key = tank_stream + "-level"
+    while scenario_running == True:
+        _, tanklevel = get_stream_CO2(tank_stream) #db check to watch for overide from MarsControl
+        _, producerrate = get_stream_CO2(producer_stream)
+        _, consumerrate = get_stream_CO2(consumer_stream)
+        if consumerrate != prev_consumerrate or producerrate != prev_producerrate:
+            ratechange_time = time() #when the rates are equal the time is not updated, reset before using in level change calculations
+            if tanklevel == 100 and producerrate == 0:
+                r.xadd(producer_error,{producer_error:"0"})
+                print("reset error to 0")
+            if tanklevel == 0 and consumerrate == 0:
+                r.xadd(consumer_error,{consumer_error:"0"})
+                print("reset error to 0")
+        if (consumerrate-producerrate) != 0: 
+            if tanklevel == 100 and producerrate != 0:  #acccount for lag between tank reaching 100 and assembly shutting down
+                r.xadd(producer_error,{producer_error: ERR["CO2_high_level"]})
+                #print(r.xrevrange(producer_error,"+","-",1))
+                print("producer error")
+            elif tanklevel == 0 and consumerrate != 0:
+                r.xadd(consumer_error,{consumer_error: ERR["CO2_low_level"]}) 
+            else:
+                deltatime = (time() - ratechange_time)
+               #print (deltatime, "time since last level update in seconds")
+                levelincrease = (producerrate - consumerrate)*RATE_CONSTANT/1000*deltatime
+                tanklevel = tanklevel + levelincrease
+                if tanklevel > 100:
+                    print("producer shutdown")
+                    #Producer must shutdown as there is no more storage space
+                    r.xadd(producer_error,{producer_error: ERR["CO2_high_level"]})
+                    tanklevel = 100
+                if tanklevel < 0:
+                    #Consumer must shutdown as supply has run out
+                    r.xadd(consumer_error,{consumer_error: ERR["CO2_low_level"]}) 
+                    tanklevel = 0
+                dict_tanklevel = {tank_stream_key : tanklevel}
+                r.xadd(tank_stream,dict_tanklevel)
+                #print("tank level to stream", dict_tanklevel)
+            
+        prev_consumerrate=consumerrate
+        prev_producerrate=producerrate
+        #if scenario_running in db there could be a graceful stop
+        sleep(2) 
+
+
+def control_level_H2O(producer_stream,producer_error, consumer_stream, 
+                  consumer_error, tank_stream):
+    _, prev_producerrate = get_stream_H2O(producer_stream) #use _ for unused variable
+    _, prev_consumerrate = get_stream_H2O(consumer_stream)
+    scenario_running = True  
+    ratechange_time = time()
+    tank_stream_key = tank_stream + "-level"
+    while scenario_running == True:
+        _, tanklevel = get_stream_H2O(tank_stream) #db check to watch for overide from MarsControl
+        _, producerrate = get_stream_H2O(producer_stream)
+        _, consumerrate = get_stream_H2O(consumer_stream)
+        if consumerrate != prev_consumerrate or producerrate != prev_producerrate:
+            #print("H2O rates not equal")
+            ratechange_time = time() #when the rates are equal the time is not updated, reset before using in level change calculations
+            if tanklevel == 100 and producerrate == 0:
+                r.xadd(producer_error,{producer_error:"0"})
+                print("reset error to 0")
+            if tanklevel == 0 and consumerrate == 0:
+                r.xadd(consumer_error,{consumer_error:"0"})
+                print("reset error to 0")
+        if (consumerrate-producerrate) != 0: 
+            if tanklevel == 100 and producerrate != 0:  #acccount for lag between tank reaching 100 and assembly shutting down
+                r.xadd(producer_error,{producer_error: ERR["H2O_high_level"]})
+                #print(r.xrevrange(producer_error,"+","-",1))
+                print("producer error")
+            elif tanklevel == 0 and consumerrate != 0:
+                r.xadd(consumer_error,{consumer_error:ERR["H2O_low_level"]})
+                print("consumer error H2O 414 low level")
+            else:
+                deltatime = (time() - ratechange_time)
+                #print (deltatime, "time since last level update in seconds")
+                levelincrease = (producerrate - consumerrate)*RATE_CONSTANT/1000*deltatime
+                tanklevel = tanklevel + levelincrease
+                if tanklevel > 100:
+                    print("producer shutdown")
+                    #Producer must shutdown as there is no more storage space
+                    r.xadd(producer_error,{producer_error: ERR["H2O_high_level"]}) 
+                    tanklevel = 100
+                if tanklevel < 0:
+                    print("consumer shutdown")
+                    #Consumer must shutdown as supply has run out
+                    r.xadd(consumer_error,{consumer_error: ERR["H2O_low_level"]}) 
+                    tanklevel = 0
+                dict_tanklevel = {tank_stream_key : tanklevel}
+                r.xadd(tank_stream,dict_tanklevel)
+                #print("tank level to stream", dict_tanklevel)
+            
+        prev_consumerrate=consumerrate
+        prev_producerrate=producerrate
+        #if scenario_running in db there could be a graceful stop
+        sleep(2) 
+        
+def get_stream_CO2(equip_stream):
+    #Finds the newest rate/level from the stream and the time it was recorded
+    #Redis stream id's starts with time from Unix Epoch
+    #value is stored as the value in a dictionary datatype
+    raw_data = r.xrevrange(equip_stream,"+","-",1)
+    #print(raw_data,"this is the raw format of the stream data")
+    extract_id = ((raw_data[0])[0]) 
+    endof_timestamp=extract_id.find("-")
+    timestamp_offby3 = int(extract_id[0:(endof_timestamp)]) 
+    timestamp = timestamp_offby3/1000 #decimal point is 3 digits from end of redis timestamp id
+    dict_info = ((raw_data[0])[1])
+    for (thevalue) in dict_info.values():  #A way to get values from key/values pairs in dict
+        value = float(thevalue)
+    return timestamp, value    
+        
+def get_stream_H2O(equip_stream):
+    #Finds the newest rate/level from the stream and the time it was recorded
+    #Redis stream id's starts with time from Unix Epoch
+    #value is stored as the value in a dictionary datatype
+    raw_data = r.xrevrange(equip_stream,"+","-",1)
+    #print(raw_data,"this is the raw format of the stream data")
+    extract_id = ((raw_data[0])[0]) 
+    endof_timestamp=extract_id.find("-")
+    timestamp_offby3 = int(extract_id[0:(endof_timestamp)]) 
+    timestamp = timestamp_offby3/1000 #decimal point is 3 digits from end of redis timestamp id
+    dict_info = ((raw_data[0])[1])
+    for (thevalue) in dict_info.values():  #A way to get values from key/values pairs in dict
+        value = float(thevalue)
+    return timestamp, value
+
 
 def xadd_redis(assembly,stream_type,value):
     stream = assembly + "-" + stream_type
-    if stream_type == "rate":
+    if stream_type == "rate" or stream_type == "level":
         r.xadd((assembly),{stream:value})
     else:
         r.xadd((stream),{stream:value})

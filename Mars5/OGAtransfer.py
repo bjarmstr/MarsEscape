@@ -9,7 +9,7 @@ presently version ogatransfer8.py
 from time import sleep, time
 import logging
 logging.basicConfig(
-    filename="timetest4.log",
+    filename="timetest5.log",
     level=logging.DEBUG,
     format="%(asctime)s;%(message)s"
     )
@@ -109,6 +109,7 @@ def pwr_detect(switched):
 def button_interrupt(sbutton):
     global Button_pressed
     Button_pressed = 1
+    print ("button pressed")
 
 # Rotarty encoder interrupt - I tried other simpler codes but had troubles with response/bouncing
 def rotary_interrupt(A_or_B):
@@ -142,12 +143,14 @@ def main():
     led_bulb("none")
     init()  
     status = "startup"                           # Init interrupts, GPIO, ...
-    if Wait_power:
-            wait_for_power()
+    while GPIO.input(SWITCH_PIN) == False:      #waiting for external power 
+        sleep(1)
+        print("waiting")
+    Wait_power = False
+    device = ssd1306(serial)
     
     while True:
         startup()
-        
         
        
             
@@ -189,10 +192,10 @@ def startup():
             draw.rectangle(device.bounding_box, outline="white", fill="black")
             draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
             draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
-    
+    sleep(.3)
     if Button_pressed == 1 :
         running()
-        status = "startup"
+        status = "startup"  #after returning from running reset
         connectAll = 0
              
     
@@ -218,8 +221,14 @@ def running():
         #Xinputs = (equip_id, "error")
         #Xerr,timestamp = query_op_parm(inputs,c) #check db, change of conditions in external equipment (eg. power from teg), or override added from escape room supervisor 
         err = get_redis("OGA-error")
+        sleep(.1)
         logging.debug("error{}".format(err))
         if err != 0:
+            #if err == 900:
+                #OGArate = get_redis("OGA")
+                #r.xadd("OGA-error",{"OGA-error":"0"})
+                #err = 0
+            #else:
             print ("error code not zero")
             status = "shutdown" 
             
@@ -260,8 +269,6 @@ def shutdown(err):
         r.xadd("OGA-error",{"OGA-error":"0"})
         Button_pressed = 0
         while (Button_pressed ==0):
-            if Wait_power:
-                wait_for_power()
             with canvas(device) as draw:
                 draw.rectangle(device.bounding_box, outline="black", fill="black")
                 draw.text((7, 14), "Start Button", font=size12, fill="white")
@@ -281,21 +288,17 @@ def shutdown(err):
                 sleep(2)    
                 sys.exit()
             if (Button_pressed ==1):
-                if Wait_power:
-                    wait_for_power()
                 with canvas(device) as draw:
                     draw.rectangle(device.bounding_box, outline="black", fill="black")
                     draw.text((7, 5), "Turn off Power", font=size14, fill="white")
                     draw.text((11, 30), "to Restart ", font=size14, fill="white")         
                 sleep(1)
-                subprocess.call(["shutdown", "-h", "now"])  
+                subprocess.call(["sudo", "shutdown", "-h", "now"])  
                 sleep(3)
     print(length,"length of button push")
-    if err ==100: #reset error to 0
+    if err ==100: #reset error to 0  should this reset more that err 100??
         r.xadd("OGA-error",{"OGA-error":"0"})
         err = 0
-    if Wait_power:
-            wait_for_power()
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
     Button_pressed = 0  #back to main function
@@ -328,14 +331,14 @@ def rotary_status(maxIndex,circular):
                 rotary_index = 0
                 if circular == True:
                     rotary_index = maxIndex
-        return
+
 
 def run_selector():
     global Menu_index, Button_pressed,first, OGArate, OGArateprev, trackMenu, rotary_index
     circular = True
     if (Menu_index == 0):  
         newmenu = 0
-        rotary_temp =rotary_status(2,circular) #is this legal rotary_index definition
+        rotary_status(2,circular) 
         display_main()
         
         if (OGArateprev != OGArate) or (trackMenu != 0):
@@ -399,9 +402,7 @@ def run_selector():
             Button_pressed = 0
     return
 
-def sudisplay (piped,pipevalue): 
-    if Wait_power:
-            wait_for_power()          
+def sudisplay (piped,pipevalue):          
     with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="white", fill="black")
             draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
@@ -443,8 +444,6 @@ def display_main():
     strH2Olevel = str(int(H2Olevel))
     strOGArate = str(OGArate)
     menustr = [['  Status: ','Running',''], ['    Rate:',strOGArate,'%'], [' H2OTank:',strH2Olevel,'%Full',]]
-    if Wait_power:
-            wait_for_power()
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         for i in range(len(menustr)):
@@ -457,8 +456,6 @@ def display_main():
                 draw.text((87,i*15+10), menustr[i][2], font=size12, fill=255)   
 
 def display_shutdown():
-    if Wait_power:
-            wait_for_power()
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((12, 7), 'Shutdown?', font=size13, fill=255) 
@@ -469,13 +466,10 @@ def display_shutdown():
                 draw.text((22, i*14+25), menu_status[i], font=size12, fill=255) 
 
 def display_rate():
-    rate = rotary_index*10
-    
-    #logging.debug("before led_strip{}".format(rate))
+    rate = rotary_index*10   
+    logging.debug("before led_strip{}".format(rate))
     led_strip(rate)
-    #logging.debug("led updated{}".format(rate))
-    if Wait_power:
-            wait_for_power()
+    logging.debug("led updated{}".format(rate))
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((5, 7), 'Production Rate ', font=size13, fill=255)  
@@ -486,7 +480,7 @@ def display_rate():
             draw.text((3, 40), '>100 not recommended', font=sizet, fill=255)
             draw.text((2, 49), 'Reduces Equipmnt Life', font=sizet, fill=255)
     
-    #logging.debug("right after display{}".format(rate))
+    logging.debug("right after display{}".format(rate))
             
 def display_tank():
     H2Olevel = get_redis("H2O")
@@ -498,8 +492,6 @@ def display_tank():
         direction = "decreasing"
     else:
         direction = "increasing"
-    if Wait_power:
-            wait_for_power()
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((7, 3), 'H2O Tank Level ', font=size13, fill=255) 
@@ -526,21 +518,21 @@ def led_strip(colorOn):
     elif colorOn <= 100:
         lightdots = int(colorOn/2.5)
         for dot in range(39,39-lightdots,-1):
-            dots[dot] = (0,80,0)
+            dots[dot] = (0,20,0)
         for dot in range (40-lightdots):
             dots[dot]=(0,0,0)
     elif (colorOn >100) and (colorOn <=150): 
         lightdots = int((colorOn-100)/2.5)
         if colorOn <=125:
             for dot in range(39,39-lightdots,-1):
-                dots[dot] = (60,60,0)
+                dots[dot] = (10,10,0)
         else:
             for dot in range(39,29,-1):
-                dots[dot] = (60,60,0)
+                dots[dot] = (10,10,0)
             for dot in range(29,39-lightdots,-1):
-                dots[dot] =(80,0,0)     
+                dots[dot] =(20,0,0)     
         for dot in range(40-lightdots):
-            dots[dot] = (0,80,0) #turn remainder green 
+            dots[dot] = (0,20,0) #turn remainder green 
 
 
 def led_strip_lvl(colorOn):
@@ -550,7 +542,7 @@ def led_strip_lvl(colorOn):
     for dot in range(40-lightdots):
         dots[dot] = (0,0,0)
     for dot in range(39,(39-lightdots),-1):
-        dots[dot] = (0,0,80)
+        dots[dot] = (0,0,20)
     print(dotRemainder,"dotRemainder -how many dots are lit")
     partialdot = int (60*dotRemainder)
     dots[(39-lightdots)] = (0,0,partialdot)

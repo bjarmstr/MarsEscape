@@ -69,6 +69,9 @@ LockRotary = threading.Lock()       # create lock for rotary switch
 
 menu_status = ['NO', 'YES']
 
+WPA_PREHEAT_CODE = 201
+PREHEAT_TEMP = 130
+
 
 def initGPIO():
     GPIO.setup(Enc_A, GPIO.IN)              
@@ -138,8 +141,8 @@ def boot_message():
        
             
 def startup():
-    print("top of startup")
     global connectAll, Button_pressed, status
+    print("top of startup", status)
     Button_pressed = 0
     piped = [0] * 6
     while connectAll < 6:
@@ -161,28 +164,34 @@ def startup():
                         #W adding piped to db is a future consideration for the MarsControl Panel
                     sudisplay(piped,pipevalue)
             else:
-                piped[i]=1  #treat nonexistant pipes as connected
-               
+                piped[i]=1  #treat nonexistant pipes as connected       
         connectAll = sum (piped)
-        
-        sleep(3)
-        status = "ready" #once piping is correct, it is not checked again
-        #Xcheck if level error has been removed
-        err = get_redis("WPA-error")
-        
-    if status == "ready":
+        sleep(1) #time to read piped screen before displaying next screen
+        status = "piped" 
+    
+    preheat = get_redis("WPA-preheat")
+    if preheat >= PREHEAT_TEMP:
+        status = "ready"
+        led_bulb("blue")
+    else:
+        status = "piped"
+        led_bulb("yellow")
+    if status == "piped":
         with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
-            draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
-        sleep(.2)
-    
+            draw.text((3, 2), "Status: Piped ", font=size15, fill="white")
+            draw.text((22, 22), "Press START", font=size12, fill="white")
+            draw.text((22, 33), "to Preheat", font=size12, fill="white")
+    elif status == "ready":
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="white", fill="black")
+            draw.text((3, 2), "Status:Preheated", font=size15, fill="white")
+            draw.text((6, 32), "Press START to Run ", font=size12, fill="white")
+    sleep(.3)    
     if Button_pressed == 1 :
+        connectAll = 0  #check piping next time unit shuts down
         running()
-        status = "startup"
-        connectAll = 0
-             
-                 
+        
     
 def running():
     global Rotary_index, Menu_index, Button_pressed, first, H2Olevel, WPArate, WPArateprev, trackMenu, status
@@ -206,72 +215,81 @@ def running():
         run_selector()
         err = get_redis("WPA-error")   
         if err != 0:
+            #if err == 900:  #***rate doesn't update if changed outside of WPA
             print ("error")
             status = "shutdown" 
-    
+        sleep(.05)
+        
     shutdown(err)
             
 def shutdown(err):
     global Button_pressed, Rotary_counter
     r.xadd(("WPA"),{"WPA-rate":"0"}) #tell the db that unit has shutdown ** this was not in origonal code
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="black", fill="black")
-        draw.text((3, 2), "Status: ", font=size12, fill="white")
-        draw.text((20, 17), "Shutting Down", font=size12, fill="white") #y12 too high
-        if err != 100:
-            err = int(err)
-            draw.text((25,26),"ERROR CODE", font=size12, fill="white")
-            draw.text((48,42),"{}".format(err), font=size13, fill="white") 
-    Button_pressed = 0
-    while Button_pressed == 0:
-        led_bulb("none")
-        led_strip(0)
-        for i in range (10):   #number of times led flashes/2
-            if i % 2 == 0:
-                led_bulb("none")
-                dots[0] = (70,0,0)
+    if err == WPA_PREHEAT_CODE:
+        display_preheat()
+        print("preheating")
+    else:
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="black", fill="black")
+            draw.text((3, 2), "Status: ", font=size12, fill="white")
+            draw.text((20, 12), "Shutting Down", font=size12, fill="white")
+            if err == 100:
+                 draw.text((22, 26), "Press Select", font=size12, fill="white")
+                 draw.text((24, 37), "to return", font=size12, fill="white")
+                 draw.text((8, 48), "to Startup Menu", font=size12, fill="white")
             else:
-                dots[0] = (0,0,0)
-                led_bulb("red")
-            sleep(.2)
-    start = time()  #long press to shutdown pi
-    led_bulb("blue")
-    while GPIO.input(sbutton) == GPIO.LOW:
-        sleep(0.01)
-    length = time() - start
-    toggle_pressed = Rotary_counter
-    if length > 4:
-        r.xadd("WPA-error",{"WPA-error":"0"})
+                draw.text((25,26),"ERROR CODE", font=size13, fill="white")
+                draw.text((48,39),"{}".format(err), font=size13, fill="white") 
+                draw.text((3,52),"Fix then Press Start", font=size12, fill="white") 
         Button_pressed = 0
-        while (Button_pressed ==0):
-            with canvas(device) as draw:
-                draw.rectangle(device.bounding_box, outline="black", fill="black")
-                draw.text((7, 14), "Start Button", font=size12, fill="white")
-                draw.text((11, 24), "to Shutdown ", font=size12, fill="white")
-                draw.text((7, 34), "Turn Dial", font=size12, fill="white")
-                draw.text((11, 44), "to Exit ", font=size12, fill="white")
-            sleep(2)
-            
-            if (Rotary_counter != toggle_pressed):  
+        while Button_pressed == 0:
+            led_bulb("none")
+            led_strip(0)
+            for i in range (10):   #number of times led flashes/2
+                if i % 2 == 0:
+                    led_bulb("none")
+                    dots[0] = (70,0,0)
+                else:
+                    dots[0] = (0,0,0)
+                    led_bulb("red")
+                sleep(.2)
+        start = time()  #long press to shutdown pi
+        led_bulb("blue")
+        while GPIO.input(sbutton) == GPIO.LOW:
+            sleep(0.01)
+        length = time() - start
+        toggle_pressed = Rotary_counter
+        if length > 4:
+            r.xadd("WPA-error",{"WPA-error":"0"})
+            Button_pressed = 0
+            while (Button_pressed ==0):
                 with canvas(device) as draw:
                     draw.rectangle(device.bounding_box, outline="black", fill="black")
-                    draw.text((7, 15), "SSH or Use", font=size12, fill="white")
-                    draw.text((11, 25), "Terminal", font=size12, fill="white") 
-                    draw.text((11, 35), "to shutdown Pi", font=size12, fill="white") 
-                sleep(3)    
-                sys.exit()
-            if (Button_pressed ==1):
-                with canvas(device) as draw:
-                    draw.rectangle(device.bounding_box, outline="black", fill="black")
-                    draw.text((7, 5), "Turn off Power", font=size14, fill="white")
-                    draw.text((11, 30), "to Restart ", font=size14, fill="white")         
-                sleep(1)
-                subprocess.call(["shutdown", "-h", "now"])  
-                sleep(3)
-    print(length,"length of button push")
+                    draw.text((7, 14), "Start Button", font=size12, fill="white")
+                    draw.text((11, 24), "to Shutdown ", font=size12, fill="white")
+                    draw.text((7, 34), "Turn Dial", font=size12, fill="white")
+                    draw.text((11, 44), "to Exit ", font=size12, fill="white")
+                sleep(2)
+                
+                if (Rotary_counter != toggle_pressed):  
+                    with canvas(device) as draw:
+                        draw.rectangle(device.bounding_box, outline="black", fill="black")
+                        draw.text((7, 15), "SSH or Use", font=size12, fill="white")
+                        draw.text((11, 25), "Terminal", font=size12, fill="white") 
+                        draw.text((11, 35), "to shutdown Pi", font=size12, fill="white") 
+                    sleep(3)    
+                    sys.exit()
+                if (Button_pressed ==1):
+                    with canvas(device) as draw:
+                        draw.rectangle(device.bounding_box, outline="black", fill="black")
+                        draw.text((7, 5), "Turn off Power", font=size14, fill="white")
+                        draw.text((11, 30), "to Restart ", font=size14, fill="white")         
+                    sleep(1)
+                    subprocess.call(["sudo", "shutdown", "-h", "now"])  
+                    sleep(3)
     if err ==100: #reset error to 0
         r.xadd("WPA-error",{"WPA-error":"0"})
-        err = 0
+        #err = 0
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
     Button_pressed = 0  #back to main function
@@ -461,8 +479,31 @@ def display_tank():
             draw.text((3,40),  "If WPArate=OGArate,", font=sizet, fill=255)
             draw.text((3,50), "level will stabilize.",font=sizet, fill=255)
         
+def display_preheat():
+    global Button_pressed
+    preheat = get_redis("WPA-preheat")
+    while preheat < PREHEAT_TEMP:
+        preheat = get_redis("WPA-preheat")
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="white", fill="black")
+            draw.text((7, 3), 'Status: Pre-heating ', font=size12, fill=255)
+            draw.text((22, 21), 'TEMPERATURE', font=size12, fill=255)
+            draw.text((10, 32),  "Required: {} deg C".format(PREHEAT_TEMP), font=size12, fill=255)
+            draw.text((10, 42),  "Actual: {} deg C".format(preheat), font=size12, fill=255)
+    
+        led_bulb("none")
+        led_strip(0)
+        for i in range (2):   #number of times led flashes/2
+            if i % 2 == 0:
+                led_bulb("none")
+            else:
+                led_bulb("yellow")
+            sleep(.4)
+        
+
+
 def led_bulb(color):
-    if color!= "none":
+    if color != "none" and color !="yellow":
         GPIO.output((pindict[color]),GPIO.LOW)
     if color != "red":
         GPIO.output(redpin,GPIO.HIGH)
@@ -470,6 +511,9 @@ def led_bulb(color):
         GPIO.output(greenpin,GPIO.HIGH)
     if color != "blue":
         GPIO.output(bluepin,GPIO.HIGH)
+    if color == "yellow":
+        GPIO.output(redpin,GPIO.LOW)
+        GPIO.output(greenpin,GPIO.LOW)
  
 
 def led_strip(colorOn):

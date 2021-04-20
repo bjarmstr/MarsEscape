@@ -498,7 +498,7 @@ def shutdown(err):
                     draw.text((11, 30), "to Restart ", font=size14, fill="white")
                 r.xadd("CDRA-error",{"CDRA-error":"0"})
                 sleep(1)
-                subprocess.call(["shutdown", "-h", "now"])  
+                subprocess.call(["sudo", "shutdown", "-h", "now"])  
                 sleep(1)
     if err ==100: #reset error to 0
         r.xadd("CDRA-error",{"CDRA-error":"0"})
