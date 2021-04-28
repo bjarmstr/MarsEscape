@@ -31,7 +31,7 @@ WPA_HOLD_TIME = 15 #seconds
 DEG_INC = 5 #5 degrees per increment
 TIME_INC = .1  #1 second delay between increments
 #(PREHEAT_TEMP-MIN_TEMP)/DEG_INC*TIME_INC = Wait time of preheat cycle
-SRA_OGA_SYNC_TIME = 6 #seconds
+SRA_OGA_SYNC_TIME = 5 #seconds
 
 ERR = {"CO2_high_level": 113, "WPA_preheat": 201, "H2O_high_level":214, "SRA_purge": 308, "CO2_low_level":313,
        "H2O_low_level":414, "OGA_not_ready":534, "SRA_not_ready":543}
@@ -40,7 +40,7 @@ ERR = {"CO2_high_level": 113, "WPA_preheat": 201, "H2O_high_level":214, "SRA_pur
 sync_start = 0
 
 hold_start_time = 0
-temp_cycle = "off"
+temp_cycle = "off"   #values: off, preheat or cooling
 preheating = True
 
 
@@ -50,8 +50,6 @@ next_val = False
 prev_rate = { "CDRA" : 0 ,"OGA" : 0 , "SRA" : 0 , "WPA" : 0 }
 
 
-
-temp_cycle = "off"   #values: off, preheat or cooling
 
 
 def main():
@@ -71,7 +69,7 @@ def main():
         r.hset("threshold",pipe,"10000")
     #use the following format to change default threshold value
     r.hset("threshold","CDRA-H2O-out","120000")
-    #r.hset("threshold","SRA-H2O-out","120000")
+    r.hset("threshold","SRA-H2O-out","120000")
     r.hset("threshold","SRA-H2-in","120000")
     r.hset("threshold","SRA-N2-in","120000")
     r.hset("threshold","SRA-CH4-out","140000")
@@ -85,40 +83,19 @@ def main():
     wpa_temp_status_thread = threading.Thread(target=wpa_temp_status, daemon=True)
     wpa_temp_status_thread.start()
     
-    user_thread = threading.Thread(target=user_input, daemon=True)
-    user_thread.start()
-    
-
     startup()
 
 
-
-
-def user_input():
-    global user_str, next_val
-    while True:
-        if (next_val == False):
-            print("Enter the Assembly Name to Start the Box?  Options: CDRA, OGA, SRA or WPA")
-            print("Enter N2 to purge the SRA unit")
-            user_str = input()
-            next_val = True
-        sleep(.3)
-        
-
 def startup():
-    global next_val
     while True:
         set_status()
         #wpa_temp_status() is running in a separate thread
         #tank_conditions() running in separate thread
-        #print_status()
-        
-        #next_val = False
         sleep(.3)
 
 
 def set_status():
-    global user_str,next_val, temp_cycle, sync_start, prev_rate
+    global temp_cycle, sync_start, prev_rate
     for assembly in ASSEMBLIES:
         new_rate = get_redis(assembly)
         if assembly == "SRA": SRA_rate  = new_rate
@@ -163,41 +140,6 @@ def set_status():
             xadd_redis("OGA","rate", 0) 
             xadd_redis("OGA","error", ERR["SRA_not_ready"])
         
-
-
-            
-        
-def print_status():
-    global next_val
-    if (next_val == True):
-        completed = True
-        for assembly in ASSEMBLIES:
-            print(assembly, "rate", get_redis(assembly),"%",get_redis(assembly+"-error"),"Error")
-            if get_redis(assembly) == 0:
-                completed = False
-        if completed == True:
-            print("CONGRATULATIONS!  You are now making oxygen")
-        print("N2",get_redis("SRA-purge"))  #light led to indicate this
-        if (get_redis("WPA-error") == ERR["WPA_preheat"]):
-            print("WPA Preheating Temp Required: 130 C, Actual: ", get_redis("WPA-preheat"), "C")
-        if (get_redis("WPA") == 0) and (temp_cycle == "holding") :
-            print("WPA preheated, ready for start-up")
-        if (get_redis("SRA-error") == ERR["SRA_purge"]):
-            print("N2 purge required before SRA start-up")
-        if (get_redis("SRA-error") == ERR["OGA_not_ready"]) or (get_redis("OGA-error") == ERR["SRA_not_ready"]):
-            print("OGA/SRA must be started within ",SRA_OGA_SYNC_TIME," seconds of each other" )
-            print("H2 gas needs to be safely consumed after creation")
-            xadd_redis("OGA","error",0)
-            xadd_redis("SRA","error",0)
-        if get_redis("SRA-error") == ERR["CO2_low_level"]:
-            print("No CO2 available for startup")
-            xadd_redis("SRA","error",0)
-        if get_redis("OGA-error") == ERR["H2O_low_level"]:
-            print("No potable water available for startup")
-            xadd_redis("OGA","error",0)
-        
-    next_val = False
-
 
 def pre_conditions(assembly):
     global temp_cycle
