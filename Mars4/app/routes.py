@@ -30,7 +30,7 @@ def login():
     hint_list =["HINT:  the surface on Mars","HINT: What is the surface material on Mars called?",
                 "HINT:  Look on the surface of Mars", "HINT: Look closely, the definition is inscribed here"]
     if request.method == 'POST':
-        if request.form['password'] != 'admin':
+        if request.form['password'] != 'REGOLITH':
             hint = int(session['hint'])
             error = 'Invalid Credentials. Please try again.'
             attempts= int(session['failed_attempts'])
