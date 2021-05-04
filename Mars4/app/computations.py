@@ -46,11 +46,13 @@ def isInteger(s):
         print("not integer")
         return False
     
-def tester():
-    time.sleep(10)  
-    print("sleep10")  
+def format_min_sec(t):
+    t_min = int(time.strftime('%M', time.gmtime(t)))
+    t_sec = int(time.strftime('%S', time.gmtime(t)))
+    if t_min > 0:
+        t_fstr = "{} minutes & {} seconds".format(t_min,t_sec)
+    else:
+        t_fstr = "{} seconds".format(t_sec)
+    return(t_fstr)
     
-    time.sleep(5)  
-    print("sleep5") 
-    time.sleep(15)  
-    print("sleep15") 
+  
