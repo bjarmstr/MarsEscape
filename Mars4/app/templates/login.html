@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+	
+      <title>{{colonyName}} Escape Room {{title}}</title>
+      <link rel="icon" type="image/png" href="/static/images/favicon-32x32.png" 
+      		sizes="32x32" />
+      
+      <link rel="stylesheet" href="/static/css/participant.css">
+	  
+	  	
+</head>
+
+  <body >
+	<main id="content" class="content">
+	
+	    <form action="" method="post">
+		    <table>
+			    <h4>AUTHORIZATION REQUIRED</h4>
+				  <tr>
+				    <td>Password:</td>
+				    <td><input type="password"  name="password" value="{{
+		        request.form.password }}"></td>
+				  </tr>
+				  <tr>
+				  	<td><input class="btn" type="submit" value="Login"></td>
+				  </tr>
+			</table>
+	    </form>	<!-- flash messages for form sanitizing -->
+		{% if error %}
+      		<p class="error"><strong>Error:</strong> {{ error }}
+        {% endif %}
+		
+		{% with messages = get_flashed_messages() %}
+		  {% if messages %}
+		  	<ul class="error">
+			    {% for message in messages %}
+			      <p>{{ message|safe }}</p>
+			      
+			    {% endfor %}
+			</ul>
+		  {% endif %}
+		{% endwith %}
+	    
+	
+
+   </main>
+  </body>
+
+<div class="footer-container">
+	<footer>
+	</footer>
+</div>
+
+

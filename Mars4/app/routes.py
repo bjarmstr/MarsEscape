@@ -7,7 +7,7 @@ from app import app
 from flask import render_template, request, flash, Response, session, redirect, url_for
 
 from app import redis_client
-from app.computations import op_data_from_db, error_codes_from_db,  isInteger, tester
+from app.computations import op_data_from_db, error_codes_from_db,  isInteger, format_min_sec
 import json
 import time
 
@@ -17,7 +17,53 @@ import time
 def context_processor():
     return dict (colonyName='Mars One')
 
+@app.route('/')
+@app.route('/index')
+def index():
+    return '<h1>MarsOne Running - /scenario for EscapeRoom Admin</h1>'
 
+#**********User pages************
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    WAIT_TIME = (16)
+    hint_list =["HINT:  the surface on Mars","HINT: What is the surface material on Mars called?",
+                "HINT:  Look on the surface of Mars", "HINT: Look closely, the definition is inscribed here"]
+    if request.method == 'POST':
+        if request.form['password'] != 'admin':
+            hint = int(session['hint'])
+            error = 'Invalid Credentials. Please try again.'
+            attempts= int(session['failed_attempts'])
+            attempts += 1
+            if attempts == 2:
+                flash(hint_list[hint])
+                session['hint_timer']= time.time()
+                session['hint'] = 1
+            if attempts > 2:
+                elapsed_time = (time.time() - session['hint_timer'])
+                if hint < 3:
+                    if elapsed_time <= WAIT_TIME:
+                        error = "Invalid Credentials. Hint available in {}.".format(format_min_sec(WAIT_TIME - elapsed_time))
+                    else:
+                        session['hint_timer']= time.time()
+                        session['hint'] = hint+1
+                    flash(hint_list[session['hint']])
+                    if  hint > 1:
+                            flash(hint_list[1])
+                else:
+                    flash(hint_list[3])
+                    flash(hint_list[1])
+            session['failed_attempts'] = attempts
+          
+        else:
+            return redirect(url_for('index'))
+    else:
+        #GET request initialize variables
+        session['failed_attempts'] = 0
+        session['hint'] = 0
+    return render_template('login.html', error=error)
+
+#***********Admin pages *****************
 @app.route('/stream')
 def stream():  
     def event_stream():
@@ -69,7 +115,7 @@ def piping():
     error = None
         #is this the first time to this page and came from scenario?
     url = request.referrer
-    if (url == "http://127.0.0.1:5000/scenario"):
+    if scenario in url:
         #start tank level calculation threads
         #reset_database
         

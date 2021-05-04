@@ -1,0 +1,38 @@
+@charset "ISO-8859-1";
+
+/*Color Pallet
+#003049 -almost black
+#D62828 - red
+#F77F00- orange
+#FCBF49 -light orange
+#EAE2B7 - cream
+*/
+
+body{
+	background-image: url("/static/images/marsRegolith.jpg");
+	color: #EAE2B7;
+
+}
+
+main{
+	margin: 25px 25px;
+}
+
+table {
+	color: #EAE2B7;
+}
+
+
+input {
+	
+  background-color: #EAE2B7 ; 
+
+}
+
+input[type=submit]{
+  background: #EAE2B7 ; 
+  padding: 3px 3px;
+  margin: 10px 12px;
+  box-sizing: border-box;
+  border-radius: 2px;
+}
