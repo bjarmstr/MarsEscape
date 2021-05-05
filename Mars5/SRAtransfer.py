@@ -106,10 +106,10 @@ def serial_compile():
             last_received = lines[-2] #last item in list is empty and second last contains latest data 
             #print(last_received,"last received")
             if "Left" in last_received:
-                Selector_counter = Selector_counter +1
+                Selector_counter = Selector_counter -1
                 print("down")
             elif "Right" in last_received:
-                Selector_counter = Selector_counter -1
+                Selector_counter = Selector_counter +1
                 print("up")
             elif "Middle" in last_received:
                 print("button select")
@@ -218,22 +218,28 @@ def startup(first_start):
                         #update_pipe_db(inputs,db,c)
                     sudisplay(piped,pipevalue)
             else:
-                piped[i]=1  #treat nonexistant pipes as connected
-                
+                piped[i]=1  #treat nonexistant pipes as connected 
             #print (connectAll, "connectAll", piped)
         connectAll = sum (piped)
-
+    if N2_purge: status = "ready"
+    if N2_purge != 1:
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="white", fill="black")
+            draw.text((3, 2), "Status: Piped ", font=size15, fill="white")
+            draw.text((22, 22), "N2 Purge", font=size12, fill="white")
+            draw.text((22, 33), "Required", font=size12, fill="white")
+    else:
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="white", fill="black")
+            draw.text((3, 2), "Status: Ready", font=size15, fill="white")
+            draw.text((6, 32), "Press START to Run ", font=size12, fill="white")
+    sleep(.3)
     print ("piping is connected, ready for startup, waiting for button press")
-    sleep(3)
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="white", fill="black")
-        draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
-        draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
-    
     if Button_pressed == 1 :
         if first_start == True:
             init()
         first_start = False
+        connectAll = 0  #check piping next time unit shuts down
         running()
         
             
@@ -257,13 +263,14 @@ def running():
 
     
     while Status == "running":
+        CO2level = get_redis("CO2")
+        run_selector() 
         err = get_redis("SRA-error")
         if err != 0:
             print ("error")
             Status = "shutdown" 
-        CO2level = get_redis("CO2")
         sleep(.05)
-        run_selector() 
+        
     
     shutdown(err)
 
