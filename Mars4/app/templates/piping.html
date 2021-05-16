@@ -27,11 +27,7 @@
 		    <td><input class="button" type="submit" value="H2O out" /></td>
 		    <td class="threshold">{{pipe_thresh["CDRA-H2O-out"]}}</td>
 		  </tr>
-		  <tr>
-		    <td><input type="text" name="CDRA-CO2-out" value=""/></td>
-		    <td><input class="button" type="submit" value="CO2 out" /></td>
-		    <td class="threshold">{{pipe_thresh["CDRA-CO2-out"]}}</td>
-		  </tr>
+
 		  
 		</table>
 	    </div>
@@ -45,11 +41,6 @@
 		    <td>{{pipe_thresh["WPA-H2O-pot-out"]}}</td>
 		  </tr>
 		  <tr>
-		    <td><input type="text" name="WPA-H2O-in-CO2" value=""/></td>
-		    <td><input class="button" input type="submit" value="H2O in CO2" /></td>
-		    <td>{{pipe_thresh["WPA-H2O-in-CO2"]}}</td>
-		  </tr>
-		  <tr>
 		    <td><input type="text" name="WPA-H2O-in-CDRA" value=""/></td>
 		    <td><input class="button" input type="submit" value="H2O in CDRA" /></td>
 		    <td>{{pipe_thresh["WPA-H2O-in-CDRA"]}}</td>
@@ -58,6 +49,11 @@
 		    <td><input type="text" name="WPA-H2O-in-SRA" value=""/></td>
 		    <td><input class="button" input type="submit" value="H2O in SRA" /></td>
 		    <td>{{pipe_thresh["WPA-H2O-in-SRA"]}}</td>
+		  </tr>
+		  <tr>
+		    <td><input type="text" name="WPA-H2O-in-LST" value=""/></td>
+		    <td><input class="button" input type="submit" value="H2O in LST" /></td>
+		    <td>{{pipe_thresh["WPA-H2O-in-LST"]}}</td>
 		  </tr>
 		</table>
 	    </div>
@@ -112,5 +108,5 @@
 		</div>
 	   
  </div>
-<p>these changes permanently override the values in database </p>
+<p>these changes temporarily override the database, marscontrol.py contains the default values </p>
 {% endblock %}

@@ -8,14 +8,27 @@
 #EAE2B7 - cream
 */
 
-body{
+body#login{
 	background-image: url("/static/images/marsRegolith.jpg");
+	background-repeat: no-repeat;
 	color: #EAE2B7;
 
 }
 
 main{
 	margin: 25px 25px;
+	max-width: 700px;
+ 	margin: auto;
+ 	border-radius: 0px;
+	
+}
+
+h1{
+	color:#F77F00;
+}
+
+h2{
+	text-align: center;
 }
 
 table {
@@ -36,3 +49,35 @@ input[type=submit]{
   box-sizing: border-box;
   border-radius: 2px;
 }
+
+.emphasis{
+	font-weight: bold;
+}
+
+.formula{
+	white-space: nowrap;
+	font-size: 90%
+}
+
+.hilite_answer{
+	font-weight: bold;
+	color: #D62828;
+}
+
+.button{
+	text-align: center;
+}
+
+a {
+  background-color: #EAE2B7;
+  color: #003049;
+  padding: 14px 25px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  border-top: 1px solid #CCCCCC;
+  border-right: 1px solid #333333;
+  border-bottom: 1px solid #333333;
+  border-left: 1px solid #CCCCCC;
+}
+

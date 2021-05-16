@@ -9,6 +9,11 @@
 */
 
 
+@font-face {
+font-family: "Fira";
+src: url("FiraSans-Regular.otf") format("opentype");
+}
+
 body{
   background:#D62828;
   margin: 0;
@@ -37,6 +42,22 @@ header{
 	text-align: center;
 	background: #D62828;
 
+
+}
+
+#warning{
+	display: inline-block;
+	border: 3px groove #003049 ;
+	background: #FCBF49;
+	color: #D62828;
+	font-size: 20 px;
+	line-height: 80%;
+	padding: 0 10px;
+	
+}
+
+#fira{
+	font-family: FiraSans-Regular, Fira, serif;
 }
 
 ul#tabs{

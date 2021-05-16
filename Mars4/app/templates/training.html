@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+{% set active_page = "training" %}
+{% extends "participant.html" %}
+
+{% block more_css %}
+<link rel="stylesheet" href="/static/css/participant.css">
+<script src="/static/js/getstream.js" defer></script>
+
+{% endblock %}
+
+{% block content %}
+
+	<h2>Safety Refresher</h2>
+	<h2>Oxygen/Carbon Dioxide/Sabatier Cycle</h2>
+	 
+		
+	  <h3> Oxygen Generating Assembly</h3>
+		<p> Combine water (H2O) and electricity to <span class="purpose"> produce oxygen </span> (O2) and hydrogen (H2)
+		 <span class="formula"> (2H2O + electricity → 2H2 + O2)</span>. </p>
+		<p> Hydrogen is very flammable and storing it a challenge.  The 
+		<span  class={{answer}}> Sabatier Reactor immediately consumes the H2 gas </span>
+		so safe storage is not required.</p>
+	 
+	  <h3>Sabatier Reactor Assembly</h3>
+		 <p>Combine Hydrogen (H2) and Carbon Dioxide (CO2) together to <span class="purpose">produce 
+		  water</span> (H2O) and Methane (CH4) <span class="formula"> (4H2 + CO2 → 2H2O + CH4)</span>. 
+		  Water is not easily obtained on Mars so <span  class={{answer}}>water 
+		  recovery by the SRA</span> is an essential part of the cycle.
+
+		<p>The H2 gas is very flammable so piping and components in the SRA 
+ 		must have all traces of the H2 gas removed before the reactor is started. 
+ 		A <span  class={{answer}}>nitrogen purge </span>is used for this purpose.
+ 		</p> 
+ 		
+ 	  <h3>Carbon Dioxide Removal Assembly</h3>
+ 		
+ 		<p>The Mars atmosphere contains 95% CO2 compared to .04% on Earth.  
+ 		Low level exposure to <span  class={{answer}}>CO2 can cause headaches, dizziness, 
+ 		and can make it hard to concentrate. At higher levels, CO2 gas is fatal.</span> </p>
+ 		<p><span class="purpose">Remove Carbon Dioxide</span> by blowing air through a bed of zeolite rocks. 
+ 		CO2 and water stick to the zeolite, while everything else passes through. </p>
+ 		
+ 	  <h3> Water Processing Assembly</h3>
+ 		
+ 		<p> High quality water, safe from contaminants is required for the Oxygen
+ 		Generating Assembly. Colonists also require drinking water to survive.
+ 		The WPA <span class="purpose">produces clean potable water</span> using physical and chemical 
+ 		processes, including filtration and temperature sterilization.</p>
+ 		
+ 	  <h3>Environmental Controls</h3>
+ 		
+ 		<p> The Environmental Controls monitors and controls the life support systems to ensure
+ 		a habitable environment. Air pressure, CO2 and O2 percentages, temperature
+ 		 and humidity are all being constantly monitored. </p>
+  		
+  		
+  		<div class="button"><a href="quiz">Start Quiz</a></div>
+ 
+ 
+		 
+		
+  
+
+	   
+{% endblock %}

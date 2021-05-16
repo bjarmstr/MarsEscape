@@ -17,10 +17,6 @@ import time
 def context_processor():
     return dict (colonyName='Mars One')
 
-@app.route('/')
-@app.route('/index')
-def index():
-    return '<h1>MarsOne Running - /scenario for EscapeRoom Admin</h1>'
 
 #**********User pages************
 @app.route('/login', methods=['GET', 'POST'])
@@ -56,12 +52,52 @@ def login():
             session['failed_attempts'] = attempts
           
         else:
-            return redirect(url_for('index'))
+            return redirect(url_for('overview'))
     else:
         #GET request initialize variables
         session['failed_attempts'] = 0
         session['hint'] = 0
     return render_template('login.html', error=error)
+
+@app.route('/')
+@app.route('/overview')
+def overview():
+    complete_values = op_data_from_db() #get all operations rates/levels from database           
+    elapsed_time = (time.time()) - (session.get('starttime'))
+    countdown = (session.get("scenario_time"))*60 - elapsed_time 
+    return render_template('overview.html', title='Colonist',
+                           op_valid= complete_values, countdown=countdown)
+
+@app.route('/training')
+def training():
+    url = request.referrer
+    if "quiz" in url:
+        answer = "hilite_answer"
+    else:
+        answer = "none"
+    return render_template('training.html', answer = answer)
+
+
+@app.route('/quiz', methods=['GET', 'POST'])
+def quiz():
+    answers = []
+    correct = {"q1":"False", "q2":"False", "q3":"False"}
+    
+    if request.method == 'POST':
+        answers = request.form
+        if answers["q1"]=="q1b": 
+            correct["q1"]="True"
+            print("correct q1")
+        if answers["q2"]=="q2d": correct["q2"]="True"
+        if answers["q3"]=="q3b": correct["q3"]="True"
+        for i in answers:
+            ##edge case neither true nor false
+            if answers[i] != 'True':
+                #highlight question in red -insert *Incorrect*
+                print('incorrect', i)
+                
+            print (i, answers[i])
+    return render_template('quiz.html', answers=answers, correct=correct )
 
 #***********Admin pages *****************
 @app.route('/stream')
@@ -115,7 +151,7 @@ def piping():
     error = None
         #is this the first time to this page and came from scenario?
     url = request.referrer
-    if scenario in url:
+    if "scenario" in url:
         #start tank level calculation threads
         #reset_database
         

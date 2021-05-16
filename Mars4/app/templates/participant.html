@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+	
+      <title>{{colonyName}} Escape Room {{title}}</title>
+      <link rel="icon" type="image/png" href="/static/images/favicon-32x32.png" 
+      		sizes="32x32" />
+      
+      <link rel="stylesheet" href="/static/css/main_style.css">
+      <script> var countdown = '{{countdown}}';</script>
+      <script src="/static/js/countdown.js" defer></script>
+ 
+      
+	  {% block more_css%}
+	  {% endblock %}
+	  
+	  	
+</head>
+  <body >
+    <header>	
+    	<h1>{{colonyName}}</h1>
+
+		<div id="warning">
+			<!-- countdown timer -->	
+			<h2><span id="fira">**</span> Warning<span id="fira">**</span></h2>
+			<h3>
+			Oxygen Remaining: 
+				<div id="countdown"> </div> 
+			</h3>
+		</div>
+	
+	</header>
+
+	<div class="main-container">
+	<main id="content" class="content">
+
+	<!-- flash messages for form sanitizing -->
+		{% with messages = get_flashed_messages() %}
+		  {% if messages %}
+		  	<ul class="error">
+			    {% for message in messages %}
+			      <li>{{ message }}</li>
+			    {% endfor %}
+			</ul>
+		  {% endif %}
+		{% endwith %}
+		  
+
+ 
+	<!-- main content here -->	  
+	        {% block content %}{% endblock %}
+	 </main>
+	</div>
+	 
+	<div class="footer-container">
+	<footer>
+	</footer>
+	</div>
+	
+  </body>
+</html>
