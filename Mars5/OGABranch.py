@@ -73,6 +73,7 @@ GPIO.output(greenpin,GPIO.HIGH)
 SWITCH_PIN= 20
 Wait_power = True
 
+
 Enc_A = 17              # Encoder input A: input GPIO 4 
 Enc_B = 18                      # Encoder input B: input GPIO 14
 sbutton = 12
@@ -100,26 +101,29 @@ def init():
     return
 
 def pwr_detect(switched):
-    global Wait_power
-    print("callback", switched)
+    global Wait_power, Status
+    print("change in power")
     if GPIO.input(SWITCH_PIN):
         print("power restored")
         Wait_power = False
     else:
         Wait_power = True
-        print("external power switch off")
+        Status = "shutdown"
+        print("external power switch off, shutdown status")
 
 def wait_for_power():
-    global Wait_power, OGArate
+    global Wait_power, OGArate, Status, device
+    print("check for power")
     if Wait_power == True:
         r.xadd("OGA",{"OGA-rate":"0"})
         OGArate = 0
         led_bulb("none")
         led_strip(0)
         Status = "shutdown"
-    while Wait_power == True:      #waiting for external power 
-        sleep(1)
-        print("waiting")
+        while Wait_power == True:      #waiting for external power 
+            sleep(1)
+            print("waiting, with 1 second delay")
+        device = ssd1306(serial)
 
 def button_interrupt(sbutton):
     global Button_pressed
@@ -158,21 +162,30 @@ def rotary_interrupt(A_or_B):
 
 
 def main():
-    global status, Wait_power, device 
+    global Status, Wait_power, device 
     led_strip(0)
     led_bulb("none") 
-    status = "startup"                           # Init interrupts, GPIO, ...
+    Status = "startup"                           # Init interrupts, GPIO, ...
     wait_for_power()      #waiting for external power 
-    print("device initialized")
-    device = ssd1306(serial)
+    print("device initialized top of main")
     
     while True:
-        startup()
-        
-       
+        try:
+            startup()
+        except Exception as e:
+            print("in exception startup loop of main",e)
+            wait_for_power()
+            print("added pause")
+            with canvas(device)as draw:
+                draw.rectangle(device.bounding_box, outline="white", fill="black")
+                draw.text((3, 2), "Recovered from", font=size12, fill="white")
+                draw.text((3, 12), "Power Outage", font=size12, fill="white")
+                draw.text((3, 22), "Press Start", font=size12, fill="white")
+            sleep(1)   
+    
             
 def startup():
-    global connectAll, Button_pressed, status
+    global connectAll, Button_pressed, Status
     Button_pressed = 0
     piped = [0] * 6
     while connectAll < 6:
@@ -198,12 +211,11 @@ def startup():
         connectAll = sum (piped)
         
         sleep(3)
-        status = "ready" #once piping is correct, it is not checked again
+        Status = "ready" #once piping is correct, it is not checked again
         #Xcheck if level error has been removed
         #err = get_redis("OGA-error")
         
-    if status == "ready":
-        wait_for_power()
+    if Status == "ready":
         with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="white", fill="black")
             draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
@@ -211,13 +223,13 @@ def startup():
     sleep(.3)
     if Button_pressed == 1 :
         running()
-        status = "startup"  #after returning from running reset
+        Status = "startup"  #after returning from running reset
         connectAll = 0
              
     
 def running():
-    global Menu_index, Button_pressed, first, OGArate, OGArateprev, trackMenu, rotary_index
-    status = "running"
+    global Menu_index, Button_pressed, first, OGArate, OGArateprev, trackMenu, rotary_index, Status
+    Status = "running"
     led_bulb("green")
     Menu_index = 0
     Button_pressed = 0
@@ -231,12 +243,12 @@ def running():
     OGArateprev = 100
     led_strip(OGArate) 
     
-    while status == "running":
+    while Status == "running":
         run_selector()
         sleep(.2)
         err = get_redis("OGA-error")
-        sleep(.1)
-        logging.debug("error{}".format(err))
+        sleep(.2)
+        #logging.debug("error{}".format(err))
         if err != 0:
             #if err == 900:
                 #OGArate = get_redis("OGA")
@@ -244,22 +256,27 @@ def running():
                 #err = 0
             #else:
             print ("error code not zero")
-            status = "shutdown" 
+            Status = "shutdown" 
             
     shutdown(err)
             
 def shutdown(err):
     global Button_pressed, Rotary_counter
+    print("in shutdown")
     r.xadd(("OGA"),{"OGA-rate":"0"}) #tell the db that unit has shutdown ** this was not in origonal code
     wait_for_power()
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
         draw.text((3, 2), "Status: ", font=size12, fill="white")
-        draw.text((20, 17), "Shutting Down", font=size12, fill="white") #y12 too high
-        if err != 100:
-            err = int(err)
-            draw.text((25,26),"ERROR CODE", font=size12, fill="white")
-            draw.text((48,42),"{}".format(err), font=size13, fill="white") 
+        draw.text((20, 12), "Shutting Down", font=size12, fill="white") #y12 too high
+        if err == 100:
+             draw.text((22, 25), "Press Select", font=size12, fill="white")
+             draw.text((24, 36), "to return", font=size12, fill="white")
+             draw.text((8, 47), "to Startup Menu", font=size12, fill="white")
+        else:    
+            draw.text((25,26),"ERROR CODE", font=size13, fill="white")
+            draw.text((48,39),"{}".format(err), font=size13, fill="white") 
+            draw.text((3,52),"Fix then Press Start", font=size12, fill="white") 
     Button_pressed = 0
     while Button_pressed == 0:
         led_bulb("none")
@@ -291,7 +308,6 @@ def shutdown(err):
             sleep(2)
             
             if (Rotary_counter != toggle_pressed):  
-                wait_for_power()
                 with canvas(device) as draw:
                     draw.rectangle(device.bounding_box, outline="black", fill="black")
                     draw.text((7, 15), "SSH or Use", font=size12, fill="white")
@@ -345,8 +361,7 @@ def run_selector():
     if (Menu_index == 0):  
         newmenu = 0
         rotary_status(2,circular) 
-        display_main()
-        
+        display_main()    
         if (OGArateprev != OGArate) or (trackMenu != 0):
             if (OGArateprev != OGArate):
                 OGArateprev = OGArate
@@ -410,51 +425,38 @@ def run_selector():
 
 def sudisplay (piped,pipevalue):    
     global device
-    try:  
-        with canvas(device) as draw:
-            try:
-                draw.rectangle(device.bounding_box, outline="white", fill="black")
-                draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
-                draw.text((3,13), "piping connections", font=size12, fill="white")
-                draw.line((1,25, 128,25),fill="white") #top horizontal line
-                draw.line((43,25, 43,64),fill="white") #vertical line 1/3rd across screen
-                draw.line((86,25, 86,64),fill="white") #vertial line 2/3rds across screen
-                draw.line((1,44, 128,44),fill="white") #horizontal line for 6 piping boxes
-                #for count in range (len(pipes)):
-                coordDict = {0:{"x":3,"y":30},1:{"x":46,"y":30},2:{"x":89,"y":30},
-                             3:{"x":3,"y":51},4:{"x":46,"y":51},5:{"x":89,"y":51}}
-                for count, coordItem in coordDict.items():
-                    x=coordItem["x"]
-                    y=coordItem["y"]  
-                    draw.text((x,y), "{}  ".format(pipes[count]), font=size13, fill="white")
-                    xcheckbox= x+21
-                    ycheckbox= y+10
-                    if pipes[count]: #if a value exists in pipes
-                        if piped[count] == 1:  #if piped place checkmark
-                            draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
-                            draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
-                        else:
-                            #display value for troubleshooting
-                            #if pipevalue[count]: #if this location has a pipe associated with it
-                            #draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") 
-                            #else:
-                            draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
-                            draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
-            except: 
-                #wait_for_power()
-                #device = ssd1306(serial)
-                print("startup caught error inside with - no action taken")                      
-    except Exception as e:
-        wait_for_power()
-        print("added pause")
-        sleep(1)
-        device = ssd1306(serial)
-        sleep(1)
-        with canvas(device)as draw:
-            draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Recovered from Power Outage", font=size12, fill="white")
-            
-        print(e,"startup caught error inside with device re-initialized")        
+    #try:  
+    
+    with canvas(device) as draw:
+        draw.rectangle(device.bounding_box, outline="white", fill="black")
+        draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
+        draw.text((3,13), "piping connections", font=size12, fill="white")
+        draw.line((1,25, 128,25),fill="white") #top horizontal line
+        draw.line((43,25, 43,64),fill="white") #vertical line 1/3rd across screen
+        draw.line((86,25, 86,64),fill="white") #vertial line 2/3rds across screen
+        draw.line((1,44, 128,44),fill="white") #horizontal line for 6 piping boxes
+        #for count in range (len(pipes)):
+        coordDict = {0:{"x":3,"y":30},1:{"x":46,"y":30},2:{"x":89,"y":30},
+                     3:{"x":3,"y":51},4:{"x":46,"y":51},5:{"x":89,"y":51}}
+        for count, coordItem in coordDict.items():
+            x=coordItem["x"]
+            y=coordItem["y"]  
+            draw.text((x,y), "{}  ".format(pipes[count]), font=size13, fill="white")
+            xcheckbox= x+21
+            ycheckbox= y+10
+            if pipes[count]: #if a value exists in pipes
+                if piped[count] == 1:  #if piped place checkmark
+                    draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
+                    draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
+                else:
+                    #display value for troubleshooting
+                    #if pipevalue[count]: #if this location has a pipe associated with it
+                    #draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") 
+                    #else:
+                    draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
+                    draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
+   # except Exception as e:
+        #print(e,"startup caught error inside su display-no action taken")        
                             
 def invert(draw,x,y,text):
     length = len(text)
@@ -616,6 +618,7 @@ if __name__ == '__main__':
                 print("waiting for power")
                 sleep(.3)
             error_count += 1
+            print("not where we want to catch the error")
             main()
         
     finally:
