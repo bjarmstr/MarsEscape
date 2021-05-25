@@ -6,6 +6,15 @@ from datetime import datetime
 import rconfig as cfg #connection data for redis database
 from checkpipe import get_light #light sensor function
 
+import logging
+
+logging.basicConfig(
+    filename="debug.log",
+    filemode="w",
+    level=logging.DEBUG,
+    format="%(asctime)s;%(message)s"
+    )
+
 import board
 import adafruit_dotstar as dotstar
 dots = dotstar.DotStar(board.SCK,board.MOSI, 8, brightness=0.1)  #default code brightness was .2
@@ -80,6 +89,8 @@ CO2level = 0
 trackMenu = 0
 Status = "startup"
 Wait_power = True
+Reset_serial = True
+Reset_i2c = True
 first = True
 
 menu_status = ['NO', 'YES']
@@ -92,11 +103,10 @@ def init():
     return
 
 def serial_compile():
-    global Selector_counter,  Button_pressed
+    global Selector_counter,  Button_pressed, ser, Wait_power
     print("serial_compile")
     buffer_string = ''
     add_to_buff = ''
-    t_end = time() + 3
     while True:
         try:
             buffer_string = str(ser.read(ser.inWaiting()))
@@ -108,6 +118,7 @@ def serial_compile():
                 lines = buffer_string.split('\\r\\n')
                 last_received = lines[-2] #last item in list is empty and second last contains latest data 
                 #print(last_received,"last received")
+                logging.debug("arduino{}".format(last_received))
                 if "Left" in last_received:
                     Selector_counter = Selector_counter -1
                     print("down")
@@ -122,12 +133,21 @@ def serial_compile():
             sleep(.03)
         except Exception as e:
             #wait_for_power()
-            print("added pause")
-            sleep(1)
-            
-            sleep(1)
- 
-            print(e,"startup caught error arduino ")
+            logging.debug("begin arduino exception{}".format(e))
+            print("ardunio thread waiting for power",e)
+            if Wait_power == True:
+                while Wait_power == True:
+                    sleep(2)
+                    print("waiting for power for arduino")
+                    #need a way out of this check if power is on**
+            if Reset_serial == True:
+                Reset_serial = False
+                ser=serial.Serial("/dev/ttyACM0",9600)
+                print("restarted serial")
+                logging.debug("arduino serial restarted")
+                sleep(1)
+            logging.debug("end arduino exception")
+            print("arduino exception ended ")
 
 def sbutton_interrupt(_pinNum):   #pinNum never used
     global Button_pressed
@@ -141,16 +161,10 @@ def sbutton_interrupt(_pinNum):   #pinNum never used
     
 def nbutton_interrupt(_pinNum):   #pinNum never used
     global N2_purge, Status
-    if not GPIO.input(sbutton):
-        print("button low")
-        sleep(.05)
-        if not GPIO.input(sbutton):
-            print("button still low - button really pushed")
-            Button_pressed = 1
-            N2_purge = 1
-            if Status == "startup":
-                r.xadd("SRA-purge",{"SRA-purge":"1"})
-                print("N2purge button - ready for startup")
+    N2_purge = 1
+    if Status == "startup":
+        r.xadd("SRA-purge",{"SRA-purge":"1"})
+        print("N2purge button - ready for startup")
             #can't purge while unit is running only in startup mode
             #reset purge to 0 when restarting startup
     print("N2purge button")
@@ -164,32 +178,30 @@ def selector_interrupt():
     Selector_counter = Selector_counter-1
     
 def pwr_detect(switched):
-    global Wait_power
-    print("callback", switched)
-    if GPIO.input(SWITCH_PIN):
-        print("power detected")
-        Wait_power = False
-    else:
-        Wait_power = True
-        print("external power switch off")
+    global Pwr_change
+    print("power detection thread")
+    logging.debug("is power_detected function")
+    Pwr_change = True
 
 def wait_for_power():
-    global Wait_power, SRArate
-    if Wait_power == True:
-        r.xadd("SRA",{"SRA-rate":"0"})
-        SRArate = 0
-        led_bulb("none")
-        led_strip(0)
-        Status = "shutdown"
-    while Wait_power == True:      #waiting for external power 
-        sleep(1)
-        pwr_detect(SWITCH_PIN)
-        print("waiting for power switch")
-    print("power restored")
+    global Pwr_change, device, Wait_power
+    sleep(.2) #allow time for value to stabalize before checking state 
+    print(GPIO.input(SWITCH_PIN), "should read False")
+    if not GPIO.input(SWITCH_PIN):
+        logging.debug("start waiting for power")
+        while not GPIO.input(SWITCH_PIN):
+            sleep(.6)
+            logging.debug("waiting for power")
+            print("waiting for power")
+    device = ssd1306(serial_display)  #device will be reset even if power change was a false reading
+    print("i2c up?")
+    Pwr_change = False
+    Wait_power = False #switch pin in main thread -- communicates value to arduino usb serial thread
+    
 
 
 def main():
-    global ser, device
+    global ser, Pwr_change
     led_strip(0)
     led_bulb("none")
     GPIO.setup(sbutton,GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -201,45 +213,31 @@ def main():
     first_startup = True
     init_database()
     wait_for_power()      #waiting for external power 
-    device = ssd1306(serial_display)
     sleep(1)
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
     print("call arduino")
-    
-    try:
-        ser=serial.Serial("/dev/ttyACM0",9600)
-        print("try")
-    except Exception as e:
-        print("wont initialize",e)
-        ser.close()
-    finally:
-        print("in the finally we survived")
-
-        ser=serial.Serial("/dev/ttyACM0",9600)
-
-    print("survived try statement ")
-    #ser=serial.Serial("/dev/ttyACM0",9600)  #serial needs power to load
-    #ser.baudrate=9600
+    logging.debug("arduino initial start")
+    ser=serial.Serial("/dev/ttyACM0",9600)
     print("arduino working")
     boot_message()
-    i = 0
     while True:
         try:
-            i += 1
-            print("start startup", i)
             startup(first_startup)
         except Exception as e:
+            logging.debug("main exception{}".format(e))
+            print("in exception startup loop of main",e)
             wait_for_power()
-            print("added pause")
-            sleep(1)
-            device = ssd1306(serial)
-            sleep(1)
+            logging.debug("main exception power restored")
+            sleep(5)
+            logging.debug("sleep for 5 - i2c should be reset")
             with canvas(device)as draw:
                 draw.rectangle(device.bounding_box, outline="white", fill="black")
-                draw.text((3, 2), "Recovered from Power Outage", font=size12, fill="white")
-                
-            print(e,"startup caught error inside with device re-initialized")
+                draw.text((3, 2), "Recovered from", font=size12, fill="white")
+                draw.text((3, 12), "Power Outage", font=size12, fill="white")
+                draw.text((3, 22), "Press Start", font=size12, fill="white")
+            sleep(1)   
+            
         
 def boot_message():
     with canvas(device) as draw:
@@ -283,16 +281,15 @@ def startup(first_start):
         led_bulb("blue")
     else: 
         led_bulb("yellow")
-        print("yellow - sstartup")
     #connectAll = 0
     piped = [0] * 6
     #print("top of startup")
+    logging.debug("top of startup")
     while connectAll < 6:
         for i in range(6):       #there are 6 squares that could have piping
             if pipepin[i] != 99: #if a pipe exists in this square
                 pipe_key = "SRA-" + pipeDb[i]
                 threshold = int(r.hget("threshold",pipe_key))
-                #print(threshold,"threshold")
                 pipestat = get_light (pipepin[i],threshold)  #check if pipe is connected  this takes time       
                 pipevalue[i] = pipestat[0]
                 if piped[i] != pipestat[1]: #there is a change            
@@ -300,14 +297,13 @@ def startup(first_start):
                         piped[i] = 0
                     else:
                         piped[i]= 1
-                        #inputs = (1, equip_id, pipeDb[i]) #connected - write status 1 to piping table
-                        #update_pipe_db(inputs,db,c)
+                    logging.debug("sudisplay ")
                     sudisplay(piped,pipevalue)
             else:
                 piped[i]=1  #treat nonexistant pipes as connected 
             #print (connectAll, "connectAll", piped)
         connectAll = sum (piped)
-    if N2_purge: status = "ready"
+        status="ready"
     if N2_purge != 1:
         with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="white", fill="black")
@@ -340,9 +336,6 @@ def running():
     Selector_index = 0
     first = True
     trackMenu = 0
-    #when start button pressed -rate changed to 100 in database and SRArate
-   #inputs = (3,"rate", 100, datetime.now())
-    #insert_op_parm(inputs,db,c)
     r.xadd("SRA",{"SRA-rate":"100"})
     SRArate = 100
     SRArateprev = 100
@@ -354,7 +347,7 @@ def running():
         run_selector() 
         err = get_redis("SRA-error")
         if err != 0:
-            print ("error")
+            print ("error code not zero")
             Status = "shutdown" 
         sleep(.05)
         
@@ -497,44 +490,45 @@ def run_selector():
             trackMenu = 3
             Button_pressed = 0
 
-def sudisplay (piped,pipevalue):           
-        with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
-            draw.text((3,13), "piping connections", font=size12, fill="white")
-            draw.line((1,25, 128,25),fill="white") #top horizontal line
-            draw.line((43,25, 43,64),fill="white") #vertical line 1/3rd across screen
-            draw.line((86,25, 86,64),fill="white") #vertial line 2/3rds across screen
-            draw.line((1,44, 128,44),fill="white") #horizontal line for 6 piping boxes
-            for count in range (len(pipes)):
-                x = 3
-                y =30
-                if count == 1:
-                    x = 46
-                elif count == 2:
-                    x = 89
-                elif count == 3:
-                    y = 51
-                elif count == 4:
-                    x = 46
-                    y = 51
-                elif count == 5:
-                    x = 89
-                    y = 51
-                draw.text((x,y), "{}  ".format(pipes[count]), font=size13, fill="white")
-                xcheckbox= x+21
-                ycheckbox= y+10
-                if pipes[count]: #if a value exists in pipes
-                    if piped[count] == 1:  #if piped place checkmark
-                        draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
-                        draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
-                    else:
-                        #if pipevalue[count] != 666:
-                        #    draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") #replace after troublehooting
-                        #else:
-                        draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
-                        draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
-                 
+def sudisplay (piped,pipevalue):       
+   
+    with canvas(device) as draw:
+        draw.rectangle(device.bounding_box, outline="white", fill="black")
+        draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
+        draw.text((3,13), "piping connections", font=size12, fill="white")
+        draw.line((1,25, 128,25),fill="white") #top horizontal line
+        draw.line((43,25, 43,64),fill="white") #vertical line 1/3rd across screen
+        draw.line((86,25, 86,64),fill="white") #vertial line 2/3rds across screen
+        draw.line((1,44, 128,44),fill="white") #horizontal line for 6 piping boxes
+        for count in range (len(pipes)):
+            x = 3
+            y =30
+            if count == 1:
+                x = 46
+            elif count == 2:
+                x = 89
+            elif count == 3:
+                y = 51
+            elif count == 4:
+                x = 46
+                y = 51
+            elif count == 5:
+                x = 89
+                y = 51
+            draw.text((x,y), "{}  ".format(pipes[count]), font=size13, fill="white")
+            xcheckbox= x+21
+            ycheckbox= y+10
+            if pipes[count]: #if a value exists in pipes
+                if piped[count] == 1:  #if piped place checkmark
+                    draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
+                    draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
+                else:
+                    #if pipevalue[count] != 666:
+                    #    draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") #replace after troublehooting
+                    #else:
+                    draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
+                    draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
+
 
 def invert(draw,x,y,text):
     length = len(text)
@@ -605,9 +599,7 @@ def display_tank():
         draw.text((3,30),  "CO2 level {}.".format(direction), font=sizet, fill=255)
         if direction != "stable":
             draw.text((3,40),  "If CDRArate=SRArate,", font=sizet, fill=255)
-            draw.text((3,50), "level will stabilize.",font=sizet, fill=255)
-            
-        
+            draw.text((3,50), "level will stabilize.",font=sizet, fill=255)      
         
 def led_bulb(color):
     if color!= "none" and color!="yellow":
@@ -622,7 +614,6 @@ def led_bulb(color):
         GPIO.output(redpin,GPIO.LOW)
         GPIO.output(greenpin,GPIO.LOW)
  
-
 def led_strip(colorOn): 
     for dot in range(8):
         dots[dot] = (0,0,0)
@@ -681,10 +672,12 @@ if __name__ == '__main__':
         
    
     finally:
+        print("final finally statement")
         r.xadd("SRA",{"SRA-rate":"0"})
         led_bulb("none")
         led_strip(0)
-        ser.close()
-        with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="black", fill="black")
+        #ser.close()
+        #print("try to close ser.close() in last final closeout")
+        #with canvas(device) as draw:
+            #draw.rectangle(device.bounding_box, outline="black", fill="black")
         GPIO.cleanup()
