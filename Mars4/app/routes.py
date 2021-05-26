@@ -52,6 +52,14 @@ def login():
             session['failed_attempts'] = attempts
           
         else:
+            answers= None
+            session['answers'] = answers
+            print(session.get("scenario_time"),"scen",session.get("starttime"),"start")
+            session['starttime']=float(redis_client.get("starttime"))
+            session['scenario_time']=int(redis_client.get('scenariotime'))
+            print(session.get("scenario_time"),"scen",session.get("starttime"),"start")
+            ##convert startime to timevalue
+            
             return redirect(url_for('overview'))
     else:
         #GET request initialize variables
@@ -71,6 +79,7 @@ def overview():
 @app.route('/training')
 def training():
     url = request.referrer
+    session['toggle']= False
     if "quiz" in url:
         answer = "hilite_answer"
     else:
@@ -80,24 +89,49 @@ def training():
 
 @app.route('/quiz', methods=['GET', 'POST'])
 def quiz():
-    answers = []
-    correct = {"q1":"False", "q2":"False", "q3":"False"}
+    answers = session.get('answers', None)
+    print("answers",answers)
+    correct = {"q1":"", "q2":"", "q3":""}
     
     if request.method == 'POST':
+        count = 0
+        correct = {"q1":"No", "q2":"No", "q3":"No"}
         answers = request.form
         if answers["q1"]=="q1b": 
             correct["q1"]="True"
-            print("correct q1")
-        if answers["q2"]=="q2d": correct["q2"]="True"
-        if answers["q3"]=="q3b": correct["q3"]="True"
-        for i in answers:
-            ##edge case neither true nor false
-            if answers[i] != 'True':
-                #highlight question in red -insert *Incorrect*
-                print('incorrect', i)
-                
-            print (i, answers[i])
-    return render_template('quiz.html', answers=answers, correct=correct )
+            count += 1
+        if answers["q2"]=="q2d": 
+            correct["q2"]="True"
+            count += 1
+        if answers["q3"]=="q3b": 
+            correct["q3"]="True"
+            count +=1
+        print(count)
+        if count == 3:
+            print("training complete")
+            redis_client.set("trained","True")
+            return render_template ('trained.html')
+        session['answers'] = answers
+    page_toggle = session.get('toggle')  
+    session['toggle']= True
+    if page_toggle == False:
+        btn_label = "submit"
+    else: btn_label = "Re-review Training Material"   
+    return render_template('quiz.html', answers=answers, correct=correct,
+                           page_toggle=page_toggle, btn_label=btn_label)
+
+@app.route('/notavailable')
+def notavailable():
+    return render_template('notavailable.html')
+
+@app.route('/errorcodes')
+def errorcodes():
+    return render_template('errorcodes.html')
+
+@app.route('/flowdiagram')
+def flowdiagram():
+    return render_template('flowdiagram.html')
+
 
 #***********Admin pages *****************
 @app.route('/stream')
@@ -139,6 +173,7 @@ def scenario():
         base_time = 30
         scenario_time=30
         session['scenario_time']=scenario_time
+        
 
     scenario_list = {'Fuse Blows': '5', 'Control board fails': '10', 'CO2 line leak': '15', 'D': '12'}
     return render_template('scenario.html', title='Scenarios', scenario_list=scenario_list,
@@ -152,11 +187,12 @@ def piping():
         #is this the first time to this page and came from scenario?
     url = request.referrer
     if "scenario" in url:
-        #start tank level calculation threads
-        #reset_database
-        
         #set initial time for countdown timer
         session['starttime']= time.time()
+        #place times into redis for retrival by a different browser
+        redis_client.set("starttime",time.time())
+        redis_client.set("scenariotime",session.get("scenario_time"))
+        
         if (int(session.get("scenario_time")) == 0):
             return redirect(url_for('scenario'))
         else:
