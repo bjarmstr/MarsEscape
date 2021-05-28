@@ -89,6 +89,7 @@ CO2level = 0
 trackMenu = 0
 Status = "startup"
 Wait_power = True
+Pwr_change = False
 Reset_serial = True
 Reset_i2c = True
 first = True
@@ -186,7 +187,7 @@ def pwr_detect(switched):
 def wait_for_power():
     global Pwr_change, device, Wait_power
     sleep(.2) #allow time for value to stabalize before checking state 
-    print(GPIO.input(SWITCH_PIN), "should read False")
+    print(GPIO.input(SWITCH_PIN), "should read False if power is off")
     if not GPIO.input(SWITCH_PIN):
         logging.debug("start waiting for power")
         while not GPIO.input(SWITCH_PIN):
@@ -201,7 +202,7 @@ def wait_for_power():
 
 
 def main():
-    global ser, Pwr_change
+    global ser
     led_strip(0)
     led_bulb("none")
     GPIO.setup(sbutton,GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -274,7 +275,7 @@ def init_database():
         break
             
 def startup(first_start):
-    global connectAll, Button_pressed, Status
+    global connectAll, Button_pressed, Status, N2_purge
     Status = "startup" 
     Button_pressed = 0
     if N2_purge == 1: 
@@ -303,29 +304,40 @@ def startup(first_start):
                 piped[i]=1  #treat nonexistant pipes as connected 
             #print (connectAll, "connectAll", piped)
         connectAll = sum (piped)
-        status="ready"
-    if N2_purge != 1:
-        with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Status: Piped ", font=size15, fill="white")
-            draw.text((22, 22), "N2 Purge", font=size12, fill="white")
-            draw.text((22, 33), "Required", font=size12, fill="white")
+    trained = r.get("trained")
+    if trained == "True":
+        if N2_purge != 1:
+            with canvas(device) as draw:
+                draw.rectangle(device.bounding_box, outline="white", fill="black")
+                draw.text((3, 2), "Status: Piped ", font=size15, fill="white")
+                draw.text((22, 22), "N2 Purge", font=size12, fill="white")
+                draw.text((22, 33), "Required", font=size12, fill="white")
+        else:
+            with canvas(device) as draw:
+                draw.rectangle(device.bounding_box, outline="white", fill="black")
+                draw.text((3, 2), "Status: Ready", font=size15, fill="white")
+                draw.text((6, 32), "Press START to Run ", font=size12, fill="white")
+        print ("piping is connected, ready for startup, waiting for button press")
+        sleep(.3)
+        if Button_pressed == 1 :
+            if first_start == True:
+                init()
+                first_start = False
+                led_strip(0)
+                connectAll = 0  #check piping next time unit shuts down
+                running()
     else:
+        Button_pressed = 0
+        N2_purge = 0
         with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Status: Ready", font=size15, fill="white")
-            draw.text((6, 32), "Press START to Run ", font=size12, fill="white")
-    sleep(.3)
-    print ("piping is connected, ready for startup, waiting for button press")
-    if Button_pressed == 1 :
-        if first_start == True:
-            init()
-        first_start = False
-        led_strip(0)
-        connectAll = 0  #check piping next time unit shuts down
-        running()
-        
-            
+            draw.text((3, 2), "Status: No Auth", font=size15, fill="white")
+            draw.text((15, 14), "Need Training ", font=size13, fill="white")
+            draw.text((14, 26), "Authorization", font=size13, fill="white") 
+            draw.text((18, 38), "to Continue", font=size13, fill="white") 
+        sleep(.3)
+    
+         
     
 def running():
     global Selector_index, Menu_index, Button_pressed, first, CO2level, SRArate, SRArateprev, trackMenu, Status

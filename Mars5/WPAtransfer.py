@@ -26,7 +26,7 @@ from luma.oled.device import ssd1306
 from luma.core.render import canvas
 from PIL import ImageFont, ImageDraw
 serial = i2c(port=1, address=0x3C)
-device = ssd1306(serial)
+#device = ssd1306(serial)
 sizet = ImageFont.load_default()
 size14= ImageFont.truetype("/home/pi/MarsOne/code2000.ttf", 14)
 size15 = ImageFont.truetype("/home/pi/MarsOne/FreePixel.ttf", 15)
@@ -56,6 +56,8 @@ GPIO.output(bluepin,GPIO.HIGH) #turn off to start
 GPIO.output(redpin,GPIO.HIGH)
 GPIO.output(greenpin,GPIO.HIGH)
 
+SWITCH_PIN= 27
+Wait_power = True
 
 Enc_A = 17              # Encoder input A: input GPIO 4 
 Enc_B = 18                      # Encoder input B: input GPIO 14
@@ -77,15 +79,44 @@ def initGPIO():
     GPIO.setup(Enc_A, GPIO.IN)              
     GPIO.setup(Enc_B, GPIO.IN)
     GPIO.setup(sbutton,GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     GPIO.add_event_detect(Enc_A, GPIO.RISING, callback=rotary_interrupt)                # NO bouncetime 
     GPIO.add_event_detect(Enc_B, GPIO.RISING, callback=rotary_interrupt)                # NO bouncetime
     GPIO.add_event_detect(sbutton, GPIO.FALLING, callback=button_interrupt, bouncetime=400)
+    GPIO.add_event_detect(SWITCH_PIN, GPIO.BOTH, callback=pwr_detect, bouncetime=500)
     return
+
+def pwr_detect(switched):
+    global Wait_power
+    print("callback", switched)
+    if GPIO.input(SWITCH_PIN):
+        print("power restored")
+        Wait_power = False
+    else:
+        Wait_power = True
+        print("external power switch off")
+
+def wait_for_power():
+    global Wait_power, OGArate
+    if Wait_power == True:
+        r.xadd("OGA",{"OGA-rate":"0"})
+        OGArate = 0
+        led_bulb("none")
+        led_strip(0)
+        Status = "shutdown"
+    while Wait_power == True:      #waiting for external power 
+        sleep(1)
+        print("waiting")
 
 def button_interrupt(sbutton):
     global Button_pressed
-    Button_pressed = 1
-    print("button pressed")
+    if not GPIO.input(sbutton):
+        print("button low")
+        sleep(.05)
+        if not GPIO.input(sbutton):
+            print("button still low - button really pushed")
+            Button_pressed = 1
+    print ("button pressed")
 
 # Rotarty encoder interrupt - I tried other simpler codes but had troubles with response/bouncing
 def rotary_interrupt(A_or_B):
@@ -113,12 +144,15 @@ def rotary_interrupt(A_or_B):
 
 
 def main():
-    global status
-    status = "startup"
+    global status, Wait_power, device 
     led_strip(0)
     led_bulb("none")
-    initGPIO()                                      # Init interrupts, GPIO, ...
+    initGPIO()   
+    wait_for_power()      #waiting for external power 
+    device = ssd1306(serial)                                    # Init interrupts, GPIO, ...
     boot_message()
+    status = "startup"
+    print("starting")
     while True:
         startup()
         
@@ -142,7 +176,7 @@ def boot_message():
             
 def startup():
     global connectAll, Button_pressed, status
-    print("top of startup", status)
+    #print("top of startup", status)
     Button_pressed = 0
     piped = [0] * 6
     while connectAll < 6:
@@ -168,29 +202,40 @@ def startup():
         connectAll = sum (piped)
         sleep(1) #time to read piped screen before displaying next screen
         status = "piped" 
-    
-    preheat = get_redis("WPA-preheat")
-    if preheat >= PREHEAT_TEMP:
-        status = "ready"
-        led_bulb("blue")
+    trained = r.get("trained")
+    if trained == "True":  
+        preheat = get_redis("WPA-preheat")
+        if preheat >= PREHEAT_TEMP:
+            status = "ready"
+            led_bulb("blue")
+        else:
+            status = "piped"
+            led_bulb("yellow")
+        if status == "piped":
+            with canvas(device) as draw:
+                draw.rectangle(device.bounding_box, outline="white", fill="black")
+                draw.text((3, 2), "Status: Piped ", font=size15, fill="white")
+                draw.text((22, 22), "Press START", font=size12, fill="white")
+                draw.text((22, 33), "to Preheat", font=size12, fill="white")
+        elif status == "ready":
+            with canvas(device) as draw:
+                draw.rectangle(device.bounding_box, outline="white", fill="black")
+                draw.text((3, 2), "Status:Preheated", font=size15, fill="white")
+                draw.text((6, 32), "Press START to Run ", font=size12, fill="white")
+        sleep(.3)    
+        if Button_pressed == 1 :
+            #connectAll = 0  #check piping next time unit shuts down
+            running()
+        
     else:
-        status = "piped"
-        led_bulb("yellow")
-    if status == "piped":
+        Button_pressed = 0
         with canvas(device) as draw:
             draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Status: Piped ", font=size15, fill="white")
-            draw.text((22, 22), "Press START", font=size12, fill="white")
-            draw.text((22, 33), "to Preheat", font=size12, fill="white")
-    elif status == "ready":
-        with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((3, 2), "Status:Preheated", font=size15, fill="white")
-            draw.text((6, 32), "Press START to Run ", font=size12, fill="white")
-    sleep(.3)    
-    if Button_pressed == 1 :
-        connectAll = 0  #check piping next time unit shuts down
-        running()
+            draw.text((3, 2), "Status: No Auth", font=size15, fill="white")
+            draw.text((15, 14), "Need Training ", font=size13, fill="white")
+            draw.text((14, 26), "Authorization", font=size13, fill="white") 
+            draw.text((18, 38), "to Continue", font=size13, fill="white") 
+        sleep(.3)
         
     
 def running():
@@ -404,12 +449,12 @@ def sudisplay (piped,pipevalue):
                     draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
                     draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
                 else:
-                    #T refactor after troublehooting
-                    if pipevalue[count]: #if this location has a pipe associated with it
-                        draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") 
-                    else:
-                        draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
-                        draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
+                    #add value instead of X for troublehooting
+                    #if pipevalue[count]: #if this location has a pipe associated with it
+                    #    draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") 
+                    #else:
+                    draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
+                    draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
                         
 
 def invert(draw,x,y,text):
@@ -488,8 +533,8 @@ def display_preheat():
             draw.rectangle(device.bounding_box, outline="white", fill="black")
             draw.text((7, 3), 'Status: Pre-heating ', font=size12, fill=255)
             draw.text((22, 21), 'TEMPERATURE', font=size12, fill=255)
-            draw.text((10, 32),  "Required: {} deg C".format(PREHEAT_TEMP), font=size12, fill=255)
-            draw.text((10, 42),  "Actual: {} deg C".format(preheat), font=size12, fill=255)
+            draw.text((10, 32),  "Required: {} degC".format(PREHEAT_TEMP), font=size12, fill=255)
+            draw.text((10, 42),  "Actual: {} degC".format(preheat), font=size12, fill=255)
     
         led_bulb("none")
         led_strip(0)
@@ -516,30 +561,31 @@ def led_bulb(color):
         GPIO.output(greenpin,GPIO.LOW)
  
 
-def led_strip(colorOn):
-    #if colorOn == 0:
+def led_strip(colorOn): 
+    #print("led_strip called")
     for dot in range(8):
         dots[dot] = (0,0,0)
     if colorOn <= 100:
-        lightdots = colorOn/20
-        for dot in range(int(lightdots)):
-            dots[dot] = (0,80,0)
-    elif (colorOn >100) and (colorOn <=200):
-        lightdot = (colorOn-100)/16.7  #rate >100
-        dotRemainder = lightdot - int(lightdot)
+        lightdot = colorOn/12.5
+        lightdot_int = int(lightdot)
+        dotRemainder = lightdot - lightdot_int
         partialdot = int (80*dotRemainder)
-        print(partialdot)
-        for dot in range(5):
-            dots[dot] = (50,50,0)
-        if lightdot < 1:
-            dots[5] = (partialdot,0,0)
-        else:
-            dots[5] =(80,0,0)
-            if lightdot <2:
-                dots[6] = (partialdot,0,0)
-            else:
-                dots[6]=(80,0,0)
-                dots[7] = (partialdot,0,0)
+        for dot in range(lightdot_int):
+            dots[dot] = (0,80,0)
+        if lightdot_int < 8:
+            dots[lightdot_int] = (0,partialdot,0)
+            
+    elif (colorOn >100) and (colorOn <=150):
+        lightdot = (colorOn-100)/12.5  #rate >100
+        lightdot_int = int(lightdot)
+        dotRemainder = lightdot - lightdot_int
+        partialdot = int (80*dotRemainder)
+        for dot in range(4):
+            dots[dot] = (0,80,0)
+        for dot in range(4, lightdot_int+4):
+            dots[dot] = (80,0,0)    
+        if lightdot_int < 4:
+            dots[lightdot_int + 4] = (partialdot,0,0) 
 
 def led_strip_lvl(colorOn):
     lightdots = colorOn/12.5
@@ -578,11 +624,7 @@ if __name__ == '__main__':
         
     except Exception as e:
         print(e, "Trouble connecting to redis db")
-        with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="white", fill="black")
-            draw.text((10,15), "Server Error",font=size12, fill="white")
-            draw.text((13,35), "- Check master Pi-", font=size12, fill="white")
-        sleep(8)
+
 
     try:
         main()
