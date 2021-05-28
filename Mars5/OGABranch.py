@@ -72,8 +72,7 @@ GPIO.output(greenpin,GPIO.HIGH)
 
 SWITCH_PIN= 20
 Wait_power = True
-Reset_i2c = False
-
+Pwr_change = False
 
 Enc_A = 17              # Encoder input A: input GPIO 4 
 Enc_B = 18                      # Encoder input B: input GPIO 14
@@ -102,32 +101,30 @@ def init():
     return
 
 def pwr_detect(switched):
-    global Wait_power, Status, Reset_i2c
-    print("change in power")
-    if GPIO.input(SWITCH_PIN):
-        print("power restored")
-        Wait_power = False
-    else:
-        Wait_power = True
-        Status = "shutdown"
-        print("external power switch off, shutdown status")
-        Reset_i2c = True
+    global Pwr_change
+    print("power detection thread")
+    Pwr_change = True
 
 def wait_for_power():
-    global Wait_power, OGArate, Status, device, Reset_i2c
-    print("check for power")
-    if Wait_power == True:
+    global Pwr_change, Wait_power, OGArate, Status, device 
+    sleep(.2) #allow time for value to stabalize before checking state     
+    print(GPIO.input(SWITCH_PIN), "should read False if power is off")
+    if not GPIO.input(SWITCH_PIN):
         r.xadd("OGA",{"OGA-rate":"0"})
         OGArate = 0
         led_bulb("none")
         led_strip(0)
         Status = "shutdown"
-        while Wait_power == True:      #waiting for external power 
-            sleep(1)
-            print("waiting, with 1 second delay")
-        print ("reset i2c")
-        device = ssd1306(serial)
-        Reset_i2c = False
+        logging.debug("start waiting for power")
+        while not GPIO.input(SWITCH_PIN):
+            sleep(.6)
+            logging.debug("waiting for power")
+            print("waiting for power")
+    device = ssd1306(serial)  #device will be reset even if power change was a false reading
+    print("i2c restarted")
+    Pwr_change = False
+    Wait_power = False #switch pin in main thread -- communicates value to arduino usb serial thread
+    
 
 def button_interrupt(sbutton):
     global Button_pressed
@@ -166,7 +163,7 @@ def rotary_interrupt(A_or_B):
 
 
 def main():
-    global Status, Wait_power, device 
+    global Status, Wait_power
     led_strip(0)
     led_bulb("none") 
     Status = "startup"                           # Init interrupts, GPIO, ...
@@ -185,6 +182,11 @@ def main():
                 draw.text((3, 2), "Recovered from", font=size12, fill="white")
                 draw.text((3, 12), "Power Outage", font=size12, fill="white")
                 draw.text((3, 22), "Press Start", font=size12, fill="white")
+            while Button_pressed == 0:
+                sleep(.6)
+                print("recovered waiting for button press")
+                Status = "ready"
+            Button_pressed = 0
             sleep(1)   
     
             
@@ -225,9 +227,7 @@ def startup():
             draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
             draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
     sleep(.3)
-    if Status == "shutdown":
-        print("shutdown activated in su from power detection")
-        shutdown(err)
+   
         
     if Button_pressed == 1 :
         running()
@@ -237,7 +237,7 @@ def startup():
     
 def running():
     global Menu_index, Button_pressed, first, OGArate, OGArateprev, trackMenu, rotary_index, Status
-    Status = "running"
+    
     led_bulb("green")
     Menu_index = 0
     Button_pressed = 0
@@ -250,12 +250,13 @@ def running():
     OGArate = 100
     OGArateprev = 100
     led_strip(OGArate) 
-    
+    Status = "running"
     while Status == "running":
         run_selector()
         sleep(.2)
         err = get_redis("OGA-error")
         sleep(.2)
+        
         #logging.debug("error{}".format(err))
         if err != 0:
             #if err == 900:
@@ -269,13 +270,12 @@ def running():
     shutdown(err)
             
 def shutdown(err):
-    global Button_pressed, Rotary_counter, Reset_i2c
+    global Button_pressed, Rotary_counter
     print("in shutdown")
     r.xadd(("OGA"),{"OGA-rate":"0"}) #tell the db that unit has shutdown ** this was not in origonal code
     wait_for_power()
-    if Reset_i2c == True:
-        print("i2c was off and turned on before reset occured")
-        Reset_i2c = False
+    #fast on/off of power can leave display off and power on
+    #wait for power resets display to ensure it is working
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
         draw.text((3, 2), "Status: ", font=size12, fill="white")
@@ -435,11 +435,6 @@ def run_selector():
     return
 
 def sudisplay (piped,pipevalue):    
-    global device, Reset_i2c
-    if Reset_i2c == True:
-        device = ssd1306(serial)
-        Reset_i2c = False
-    
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
