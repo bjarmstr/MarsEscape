@@ -15,46 +15,58 @@
 <form class= "quiz" action="#" method="post">	  
 
 	  
-	    <p {% if correct["q1"] != "True" %} class="incorrect"><span> Incorrect</span{% endif %}>Question 1: What is the main purpose of the Sabatier Reactor?</p>
+	    <p {% if correct["q1"] == "No" %} class="incorrect">
+	    		<span> Incorrect </span{% endif %}>
+	    		Question 1: What is the main purpose of the Sabatier Reactor?
+	    </p>
 		    <input type="radio" id="1a" name="q1" value="q1a" {% if answers["q1"] == "q1a" %} checked {% endif %}>
 			<label for="1a">a) To burn the hydrogen gas </label><br>
-			<input type="radio" id="1b" name="q1" value="q1b" {% if answers["q1"] == "q1a" %} checked {% endif %}>
+			<input type="radio" id="1b" name="q1" value="q1b" {% if answers["q1"] == "q1b" %} checked {% endif %}>
 			<label for="1b">b) To recover water</label><br>
-			<input type="radio" id="1c" name="q1" value="q1c" {% if answers["q1"] == "q1a" %} checked {% endif %}>
+			<input type="radio" id="1c" name="q1" value="q1c" {% if answers["q1"] == "q1c" %} checked {% endif %}>
 			<label for="1c">c) To reduce the CO2 levels</label><br>
-			<input type="radio" id="1d" name="q1" value="q1d" {% if answers["q1"] == "q1a" %} checked {% endif %}>
+			<input type="radio" id="1d" name="q1" value="q1d" {% if answers["q1"] == "q1d" %} checked {% endif %}>
 			<label for="1d">d) To remove nitrogen</label><br>
-		<p>Question 2: How is the hydrogen fire risk mitigated?</p>
-			<input type="radio" id="2a" name="q2" value="False">
+			
+		<p {% if correct["q2"] == "No" %} class="incorrect"> 
+				<span> Incorrect </span{% endif %}>
+				Question 2: How is the hydrogen fire risk mitigated?
+		</p>
+			<input type="radio" id="2a" name="q2" value="q2a" {% if answers["q2"] == "q2a" %} checked {% endif %}>
 			<label for="2a">a) Water is available.</label><br>
-			<input type="radio" id="2b" name="q2" value="False">
+			<input type="radio" id="2b" name="q2" value="q2b" {% if answers["q2"] == "q2b" %} checked {% endif %}>
 			<label for="2b">b) Purge equipment with inert gas before adding H2.</label><br>
-			<input type="radio" id="2c" name="q2" value="True">
+			<input type="radio" id="2c" name="q2" value="q2c" {% if answers["q2"] == "q2c" %} checked {% endif %}>
 			<label for="2c">c) Use the H2 gas immediately after creation.</label><br>
-			<input type="radio" id="2d" name="q2" value="True">
+			<input type="radio" id="2d" name="q2" value="q2d" {% if answers["q2"] == "q2d" %} checked {% endif %}>
 			<label for="2d">d) answers b & c</label><br>
-		<p>Question 3: Why is a CO2 monitoring sensor important?</p>
-			<input type="radio" id="3a" name="q3" value="False">
+		<p {% if correct["q3"] == "No" %} class="incorrect">
+				<span> Incorrect </span><br{% endif %}>
+				Question 3: Why is a CO2 monitoring sensor important?</p>
+			<input type="radio" id="3a" name="q3" value="q3a" 
+				{% if answers["q3"] == "q3a" %} checked {% endif %}>
 			<label for="3a">a) CO2 is very flammable</label><br>
-			<input type="radio" id="3b" name="q3" value="True">
+			<input type="radio" id="3b" name="q3" value="q3b"
+				 {% if answers["q3"] == "q3b" %} checked {% endif %}>
 			<label for="3b">b) CO2 can cause adverse health conditions and is fatal 
 			in high concentrations </label><br>
-			<input type="radio" id="3c" name="q3" value="False">
+			<input type="radio" id="3c" name="q3" value="q3c" 
+				{% if answers["q3"] == "q3c" %} checked {% endif %}>
 			<label for="3c">c) CO2 is heavier than air</label><br>
-			<input type="radio" id="3d" name="q3" value="False">
+			<input type="radio" id="3d" name="q3" value="q3d" {% if answers["q3"] == "q3d" %} checked {% endif %}>
 			<label for="3d">d) CO2 has an acidic smell</label><br>
 		
 		
 		
-	<input class="button" type="submit" value="submit" />
-
-
-		<p></p>
+	<input {% if page_toggle == True%}  hidden {% endif %} class="button" 
+		type="submit" value={{btn_label}} />
 		
-		<li><a href="training">Refresher Training</a>
-		{{answers["q1"]}}{{answers["q2"]}}{{answers["q3"]}}
+
+	
 		
-  
+		<li><a href="training">Re-review Training</a>
+		
+
 
 	   
 {% endblock %}

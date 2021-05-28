@@ -1,0 +1,40 @@
+
+/*Color Pallet
+#003049 -almost black
+#D62828 - red
+#F77F00- orange
+#FCBF49 -light orange
+#EAE2B7 - cream
+*/
+
+html, body,div {
+  height: 100%;
+}
+
+.pdf{
+
+  display: flex;
+  justify-content: center;
+}
+
+
+nav a{
+	color: #D62828;
+	text-decoration: none;
+	display: inline-block;
+	border-width:5px;  
+    border-style:outset;
+    font-size: 22px;
+    background: #FCBF49;
+    border-color: #EAE2B7;	
+    padding: 3px;
+    margin: 4px;
+}
+
+
+.full-screen {
+  width:60%;
+  height:100%;
+  background: #EAE2B7;
+}
+

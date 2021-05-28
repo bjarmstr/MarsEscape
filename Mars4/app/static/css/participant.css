@@ -81,3 +81,10 @@ a {
   border-left: 1px solid #CCCCCC;
 }
 
+.incorrect{
+	background-color: #EAE2B7;
+	font-weight: bold;
+	color: #D62828
+	
+}
+
