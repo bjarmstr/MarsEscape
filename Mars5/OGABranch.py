@@ -72,6 +72,7 @@ GPIO.output(greenpin,GPIO.HIGH)
 
 SWITCH_PIN= 20
 Wait_power = True
+Reset_i2c = False
 
 
 Enc_A = 17              # Encoder input A: input GPIO 4 
@@ -101,7 +102,7 @@ def init():
     return
 
 def pwr_detect(switched):
-    global Wait_power, Status
+    global Wait_power, Status, Reset_i2c
     print("change in power")
     if GPIO.input(SWITCH_PIN):
         print("power restored")
@@ -110,9 +111,10 @@ def pwr_detect(switched):
         Wait_power = True
         Status = "shutdown"
         print("external power switch off, shutdown status")
+        Reset_i2c = True
 
 def wait_for_power():
-    global Wait_power, OGArate, Status, device
+    global Wait_power, OGArate, Status, device, Reset_i2c
     print("check for power")
     if Wait_power == True:
         r.xadd("OGA",{"OGA-rate":"0"})
@@ -123,7 +125,9 @@ def wait_for_power():
         while Wait_power == True:      #waiting for external power 
             sleep(1)
             print("waiting, with 1 second delay")
+        print ("reset i2c")
         device = ssd1306(serial)
+        Reset_i2c = False
 
 def button_interrupt(sbutton):
     global Button_pressed
@@ -204,7 +208,7 @@ def startup():
                     else:
                         piped[i]= 1
                         #W adding piped to db is a future consideration for the MarsControl Panel
-                    sudisplay(piped,pipevalue)
+                    sudisplay(piped,pipevalue) 
             else:
                 piped[i]=1  #treat nonexistant pipes as connected
                
@@ -221,6 +225,10 @@ def startup():
             draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
             draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
     sleep(.3)
+    if Status == "shutdown":
+        print("shutdown activated in su from power detection")
+        shutdown(err)
+        
     if Button_pressed == 1 :
         running()
         Status = "startup"  #after returning from running reset
@@ -261,10 +269,13 @@ def running():
     shutdown(err)
             
 def shutdown(err):
-    global Button_pressed, Rotary_counter
+    global Button_pressed, Rotary_counter, Reset_i2c
     print("in shutdown")
     r.xadd(("OGA"),{"OGA-rate":"0"}) #tell the db that unit has shutdown ** this was not in origonal code
     wait_for_power()
+    if Reset_i2c == True:
+        print("i2c was off and turned on before reset occured")
+        Reset_i2c = False
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="black", fill="black")
         draw.text((3, 2), "Status: ", font=size12, fill="white")
@@ -424,8 +435,10 @@ def run_selector():
     return
 
 def sudisplay (piped,pipevalue):    
-    global device
-    #try:  
+    global device, Reset_i2c
+    if Reset_i2c == True:
+        device = ssd1306(serial)
+        Reset_i2c = False
     
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
@@ -455,6 +468,7 @@ def sudisplay (piped,pipevalue):
                     #else:
                     draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
                     draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
+
    # except Exception as e:
         #print(e,"startup caught error inside su display-no action taken")        
                             
