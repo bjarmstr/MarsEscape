@@ -8,19 +8,11 @@
 #EAE2B7 - cream
 */
 
-body#login{
-	background-image: url("/static/images/marsRegolith.jpg");
-	background-repeat: no-repeat;
-	color: #EAE2B7;
-
-}
-
 main{
 	margin: 25px 25px;
 	max-width: 700px;
  	margin: auto;
- 	border-radius: 0px;
-	
+ 	border-radius: 0px;	
 }
 
 h1{
@@ -35,11 +27,8 @@ table {
 	color: #EAE2B7;
 }
 
-
-input {
-	
+input {	
   background-color: #EAE2B7 ; 
-
 }
 
 input[type=submit]{
