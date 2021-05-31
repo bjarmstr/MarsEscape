@@ -64,7 +64,7 @@ GPIO.setup(FUSE, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 Fuse_fixed = False
 FUSE_CODE = 107
 
-SWITCH = 16
+SWITCH_PIN = 16
 SWITCH_LED = 20
 GPIO.setup(SWITCH_LED, GPIO.OUT)
 GPIO.output(SWITCH_LED,GPIO.HIGH)
@@ -91,6 +91,7 @@ first = True
 arduino_connect = False
 test_leak_Arduino = False
 menu_status = ['NO', 'YES'] #shutdown menu
+Wait_power = True
 
 
 def init():
@@ -142,13 +143,17 @@ def serial_compile():
 
 def sbutton_interrupt(pinNum):   #pinNum never used
     global Button_pressed
-    Button_pressed = 1
-    print("button pressed")
+    if not GPIO.input(sbutton):
+        print("button low")
+        sleep(.05)
+        if not GPIO.input(sbutton):
+            print("button still low - button really pushed")
+            Button_pressed = 1
+    print ("button pressed")
     
 
 def selector_interrupt():
     global Selector_counter
-    
     #if up button is pressed:
     Selector_counter = Selector_counter +1
     #if down button is pressed:
@@ -160,19 +165,12 @@ def main():
     led_bulb("none")
     GPIO.setup(sbutton,GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.add_event_detect(sbutton, GPIO.FALLING, callback=sbutton_interrupt, bouncetime=400)
-    GPIO.setup(SWITCH, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    GPIO.add_event_detect(SWITCH, GPIO.BOTH, callback=pwr_detect, bouncetime=500)
+    GPIO.setup(SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.add_event_detect(SWITCH_PIN, GPIO.BOTH, callback=pwr_led, bouncetime=500)
     first_startup = True
+    wait_for_power()
+    GPIO.output(SWITCH_LED,GPIO.LOW)
     boot_message() #initialize serial
-    init_database()
-    with canvas(device) as draw:
-            draw.rectangle(device.bounding_box, outline="black", fill="black")
-    while GPIO.input(SWITCH) == False:      #waiting for external power 
-        sleep(1)
-        print("waiting for power switch") 
-    GPIO.output(SWITCH_LED,GPIO.LOW) 
-     
-    
     while True:
         startup(first_startup)
         
@@ -245,7 +243,7 @@ def startup(first_start):
             print (connectAll, "connectAll", piped)
         connectAll = sum (piped)
         
-    Status = "ready" #once piping is correct, it is not checked again
+    Status = "ready" 
     led_bulb("none")
     print(arduino_connect, "arduino connection in start-up")
     if (arduino_connect == False):
@@ -277,20 +275,33 @@ def startup(first_start):
         sudisplay(piped,pipevalue)
     print ("piping is connected, ready for startup, waiting for button press")
     sleep(2)
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="white", fill="black")
-        draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
-        draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
+    trained = r.get("trained")
+    if trained == "True":   
     
-    if Button_pressed == 1 :
-        if first_start == True:
-            print("initialize here?")
-            ser.write(b'B')
-        first_start = False
-        Status = "startup"
-        running()
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="white", fill="black")
+            draw.text((3, 2), "Status: Ready ", font=size15, fill="white")
+            draw.text((6, 33), "Press START to Run ", font=size12, fill="white")
         
-            
+        if Button_pressed == 1 :
+            if first_start == True:
+                print("initialize here?")
+                ser.write(b'B')
+            first_start = False
+            connectAll = 0
+            Status = "startup"
+            running()
+        
+    else:
+        Button_pressed = 0
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="white", fill="black")
+            draw.text((3, 2), "Status: No Auth", font=size15, fill="white")
+            draw.text((15, 14), "Need Training ", font=size13, fill="white")
+            draw.text((14, 26), "Authorization", font=size13, fill="white") 
+            draw.text((18, 38), "to Continue", font=size13, fill="white") 
+        sleep(.3)
+                    
     
 def running():
     global Selector_index, Menu_index, Button_pressed, first, CO2level, CDRArate, CDRArateprev, trackMenu, Status
@@ -301,24 +312,17 @@ def running():
     Selector_index = 0
     first = True
     trackMenu = 0
-    #when start button pressed -rate changed to 100 in database and CDRArate
-    #inputs = (3,"rate", 100, datetime.now())
-    #insert_op_parm(inputs,db,c)
     dict_rate = {"CDRA-rate":"100"}
     r.xadd("CDRA",dict_rate)
     CDRArate = 100
     CDRArateprev = 100
     led_strip(CDRArate)
-
-    
+     
     while Status == "running":
-        #inputs = ("13", "level") #CO2 tank id 13
-        #CO2level,timestamp = query_op_parm(inputs,c)
         CO2level = get_redis("CO2")
         sleep(.05)
         run_selector()
-        #inputs = (equip_id, "error")
-        #err,timestamp = query_op_parm(inputs,c) #check db, change of conditions in external equipment (eg. power from teg), or override added from escape room supervisor 
+        sleep(.05)
         err = get_redis("CDRA-error")
         if err != 0:
             print ("error")
@@ -366,18 +370,19 @@ def scenario_CO2_leak():
         sleep(.8)
         print("above leak test")
         j,i = 0,0
+        countdown = 75
         startTimer = time()
         while test_leak_Arduino == True:
             if ((startTimer + 25)< time()):
                 print("Ardunio taking too long - lost communication?", startTimer)
-            CDRArate = reduce_rate(CDRArate) #CDRArate is no longer an integer
+            CDRArate = reduce_rate(CDRArate) 
             j += 1
             i += 1
+            countdown -=1
             with canvas(device) as draw:
                 draw.rectangle(device.bounding_box, outline="black", fill="black")
                 draw.text((3, 1), "Checking Status: ", font=size13, fill="white")
-                draw.text((3, 16),"{},{}".format(j,CDRArate), font=size12, fill="white")
-                draw.text((36, 26),"12345678", font=size12, fill="white")
+                draw.text((14, 18),"{}".format(countdown), font=size14, fill="white")
              
             err = get_redis("CDRA-error")  #MarsOne Operator can override pressure error
             if err != 111:  #any error code will reset CO2 error to 0
@@ -396,6 +401,7 @@ def scenario_CO2_leak():
                     draw.text((15,28),"Fix Problem", font=size12, fill="white")
                     draw.text((10,40), "then press start",font=size12, fill="white")  
                 sleep(.1)
+                countdown = 75
                 while Button_pressed == 0:
                     sleep(.2)  #need to sleep to give other threads priority
                 Button_pressed = 0
@@ -421,19 +427,21 @@ def scenario_CO2_leak():
      
 def scenario_fuse_blown():
     global CDRArate
-    led_bulb("none")
-    led_strip(0)
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="black", fill="black")
-    CDRArate = 0
-    dict_rate = {"CDRA-rate":"0"}
-    r.xadd("CDRA",dict_rate)
-    err = get_redis("CDRA-error")
-    while GPIO.input(FUSE) == False or err == 117:      #fuse needs replacement 
+    if (GPIO.input(FUSE)) == False:
+        led_bulb("none")
+        led_strip(0)
+        GPIO.output(SWITCH_LED,GPIO.HIGH)
+        with canvas(device) as draw:
+            draw.rectangle(device.bounding_box, outline="black", fill="black")
+        CDRArate = 0
+        dict_rate = {"CDRA-rate":"0"}
+        r.xadd("CDRA",dict_rate)
+        #err = get_redis("CDRA-error")
+    while (GPIO.input(FUSE)) == False:      #fuse needs replacement 
         print("waiting for fuse to be fixed")
-        err = get_redis("CDRA-error")
         sleep(1)
     r.xadd("CDRA-error",{"CDRA-error":"0"})
+    pwr_led(18)
     print("fuse fixed")
             
             
@@ -488,7 +496,7 @@ def shutdown(err):
                     draw.text((7, 15), "SSH or Use", font=size12, fill="white")
                     draw.text((11, 25), "Terminal", font=size12, fill="white") 
                     draw.text((11, 35), "to shutdown Pi", font=size12, fill="white")
-                r.xadd("CDRA-error",{"CDRA-error":"0"})  
+                #r.xadd("CDRA-error",{"CDRA-error":"0"})  
                 sleep(2)    
                 sys.exit()
             if (Button_pressed ==1):
@@ -496,29 +504,46 @@ def shutdown(err):
                     draw.rectangle(device.bounding_box, outline="black", fill="black")
                     draw.text((7, 5), "Turn off Power", font=size14, fill="white")
                     draw.text((11, 30), "to Restart ", font=size14, fill="white")
-                r.xadd("CDRA-error",{"CDRA-error":"0"})
+                #r.xadd("CDRA-error",{"CDRA-error":"0"})
                 sleep(1)
                 subprocess.call(["sudo", "shutdown", "-h", "now"])  
                 sleep(1)
     if err ==100: #reset error to 0
-        r.xadd("CDRA-error",{"CDRA-error":"0"})
+        r.xadd("CDRA-error",{})
         err = 0
-    with canvas(device) as draw:
-        draw.rectangle(device.bounding_box, outline="black", fill="black")
-        draw.text((7, 15), "CDRA Rate = 0%", font=size13, fill="white")#y 5 too high
+    #with canvas(device) as draw:
+    #   draw.rectangle(device.bounding_box, outline="black", fill="black")
+    #   draw.text((7, 15), "CDRA Rate = 0%", font=size13, fill="white")#y 5 too high
 
     Button_pressed = 0  #back to main function
     print(Status,"status, bottom of shutdown")
 
-def pwr_detect(_pin):
-    sleep(.5)
-    if GPIO.input(SWITCH):
+def pwr_led(_pin):
+    sleep(.2)
+    if GPIO.input(SWITCH_PIN):
         print("power on")
-        GPIO.output(SWITCH_LED,GPIO.LOW)
-        
+        err = get_redis("CDRA-error")
+        if err != FUSE_CODE:
+            GPIO.output(SWITCH_LED,GPIO.LOW) 
+            Wait_power = False    
     else:
         print("power switch off")
         GPIO.output(SWITCH_LED,GPIO.HIGH)
+        
+def wait_for_power():
+    global CDRArate, Status
+    if not GPIO.input(SWITCH_PIN):
+        r.xadd("CDRA",{"CDRA-rate":"0"})
+        CDRArate = 0
+        led_bulb("none")
+        led_strip(0)
+        Status = "shutdown"
+        while not GPIO.input(SWITCH_PIN):
+            sleep(.6)
+            print("waiting for power")
+
+
+        
         
 def fuse_detect(_pin):
     global Fuse_fixed
@@ -600,10 +625,8 @@ def run_selector():
             
     elif (Menu_index == 2):
         if first:
-            #inputs = (equip_id, "rate") 
-            #CDRArate,timestamp = query_op_parm(inputs,c)
             CDRArate = get_redis("CDRA")
-            Selector_index = int(CDRArate/10) # negative so top button increases rate
+            Selector_index = int(CDRArate/10)
             first = False
         circular = False
         selector_status(15,circular)
@@ -616,8 +639,6 @@ def run_selector():
             Menu_index = 0
             circular = True
             first = True
-            #inputs = (3,"rate", CDRArate, datetime.now())
-            #insert_op_parm(inputs,db,c)
             dict_rate = {"CDRA-rate":CDRArate}
             r.xadd("CDRA",dict_rate)
              
@@ -628,7 +649,8 @@ def run_selector():
             trackMenu = 3
             Button_pressed = 0
 
-def sudisplay (piped,pipevalue):           
+def sudisplay (piped,pipevalue): 
+    wait_for_power()          
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((3, 2), "Status: Startup ", font=size12, fill="white")
@@ -660,11 +682,11 @@ def sudisplay (piped,pipevalue):
                     draw.line((xcheckbox,ycheckbox-4, xcheckbox+4,ycheckbox), fill="white")  
                     draw.line((xcheckbox+5,ycheckbox, xcheckbox+13,ycheckbox-11), fill="white")
                 else:
-                    if pipevalue[count] != 666:
-                        draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") #replace after troublehooting
-                    else:
-                        draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
-                        draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
+                    #if pipevalue[count] != 666:
+                    #    draw.text((xcheckbox,ycheckbox-10), "{0:0.0f}".format(pipevalue[count]) , font=size12, fill="white") #replace after troublehooting
+                    #else:
+                    draw.line((xcheckbox+1,ycheckbox-11, xcheckbox+10,ycheckbox), fill="white") #x in checkbox
+                    draw.line((xcheckbox+1,ycheckbox, xcheckbox+10,ycheckbox-11), fill="white")
                         
 
 def invert(draw,x,y,text):
@@ -674,7 +696,7 @@ def invert(draw,x,y,text):
     draw.text((x, y), text, font= size12, outline=0,fill="black")
     
 def display_main(Selector_index):
-    
+    wait_for_power()
     global CO2level, CDRArate
     strCO2level = str(int(CO2level))
     strCDRArate = str(CDRArate)
@@ -693,6 +715,7 @@ def display_main(Selector_index):
       
 
 def display_shutdown():
+    wait_for_power()
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((8, 5), 'Shutdown?', font=size13, fill=255) #Y7 too low
@@ -703,6 +726,7 @@ def display_shutdown():
                 draw.text((22, i*14+25), menu_status[i], font=size12, fill=255) 
 
 def display_rate():
+    wait_for_power()
     global Selector_index
     rate = Selector_index*10
     with canvas(device) as draw:
@@ -716,19 +740,14 @@ def display_rate():
             draw.text((2, 49), 'Reduces Equipmnt Life', font=sizet, fill=255)
             
 def display_tank():
+    wait_for_power()
     global CO2level
     with canvas(device) as draw:
         draw.rectangle(device.bounding_box, outline="white", fill="black")
         draw.text((7, 3), 'CO2 Tank Level ', font=size13, fill=255)
-        #inputs = ("13", "level") #CO2 tank id 13
-        #CO2level,TimeT = query_op_parm(inputs,c)
         CO2level = get_redis("CO2")
         led_strip_lvl(int(CO2level))
-        #inputs = ("2", "rate") 
-        #strWPArate,TimeT = query_op_parm(inputs,c)
-        #******************change to CO2 **********************
         SRArate = get_redis("SRA")
-       # WPArate = int(strWPArate)
         if (SRArate - CDRArate) == 0:
             direction = "stable"
         elif (SRArate - CDRArate)< 0:
@@ -761,9 +780,9 @@ def led_strip(colorOn):
         dotRemainder = lightdot - lightdot_int
         partialdot = int (80*dotRemainder)
         for dot in range(lightdot_int):
-            print(dot, "out of", lightdot_int)
+            #print(dot, "out of", lightdot_int)
             dots[dot] = (0,80,0)
-        print(partialdot, "partialdot")
+        #print(partialdot, "partialdot")
         if lightdot_int < 8:
             dots[lightdot_int] = (0,partialdot,0)
             
@@ -772,7 +791,7 @@ def led_strip(colorOn):
         lightdot_int = int(lightdot)
         dotRemainder = lightdot - lightdot_int
         partialdot = int (80*dotRemainder)
-        print(partialdot)
+        #print(partialdot)
         for dot in range(4):
             dots[dot] = (0,80,0)
         for dot in range(4, lightdot_int+4):
@@ -824,6 +843,12 @@ def get_redis(equip_stream):
 if __name__ == '__main__':
    
     try:
+        init_database()
+    except Exception as e:
+        print(e, "Trouble connecting to redis db")
+   
+    try:
+        
         main()
     except KeyboardInterrupt:
         print ("interrupt - ending")
