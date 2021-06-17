@@ -9,7 +9,7 @@
 {% block content %}
   
 	<h2>Photocell threshold value for Piping</h2>
-	<p>Increase the threshold, if piped but reading unconnected.  Decrease the 
+	<p>Decrease the threshold, if piped but reading unconnected.  Increase the 
 		threshold, if not piped but reading connected.</p>
     {%if error%}
 		<p class="error"><strong>Error:</strong>{{error}}</p>
@@ -50,12 +50,12 @@
 		    <td><input class="button" input type="submit" value="H2O in SRA" /></td>
 		    <td>{{pipe_thresh["WPA-H2O-in-SRA"]}}</td>
 		  </tr>
-		  <tr>
 		    <td><input type="text" name="WPA-H2O-in-LST" value=""/></td>
 		    <td><input class="button" input type="submit" value="H2O in LST" /></td>
 		    <td>{{pipe_thresh["WPA-H2O-in-LST"]}}</td>
 		  </tr>
 		</table>
+		<p class="subnote">** LST located bottom middle & SRA located bottom left </p>
 	    </div>
 	<!-- ------ SRA -->
 	   <div class="SRA">

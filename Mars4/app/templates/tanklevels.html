@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+{% set active_page = "tanklevels" %}
+{% extends "participant.html" %}
+
+{% block more_css %}
+<link rel="stylesheet" href="/static/css/scenarios.css">
+<link rel="stylesheet" href="/static/css/op.css">
+<script src="/static/js/getstream.js" defer></script>
+{% endblock %}
+
+
+{% block content %}
+
+ <div class="pdf">
+  <nav >
+	<a href="overview">File Explorer</a></nav>
+
+	</div>
+		
+ <div class="wrapper">	  
+	
+	<!-- ------ Tank Levels -->
+	   <div class="levels">
+	   <table>
+	    <h4>Tank Levels</h4>
+		  <tr class="WPA H2O" >
+		    <td>H2O level</td>
+		    <td id="H2O-level"> {% set h2o = op_valid["H2O-level"]|int|round %}
+		    {{h2o}}</td>
+		    <td> %</td>
+		  </tr>
+		  <tr class="CDRA CO2">
+		    <td>CO2 level</td>
+		    <td id="CO2-level">{% set co2 = op_valid["CO2-level"]|int|round %}{{co2}}</td>
+		    <td> %</td>
+		  </tr>
+	
+		</table>
+		<p class="H2O">WPA fills and OGA empties the H2O tank.</p>
+		<p class="CO2">CDRA fills and SRA empties the H2O tank.</p>
+		</div>
+</div>
+{% endblock %}

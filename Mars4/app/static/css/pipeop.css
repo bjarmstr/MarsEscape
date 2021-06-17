@@ -63,6 +63,15 @@ input[type=text] {
  
 }
 
+.trained .button{
+	border-width:5px;  
+    border-style:outset;
+    font-size: 16px;
+    background: #FCBF49;
+    border-color: #FCBF49;
+    min-width: 80.6px;
+}
+
 .CDRA .button{
 	border-width:5px;  
     border-style:outset;
@@ -111,6 +120,9 @@ input[type=text] {
     min-width: 80.6px;
 }
 
+
+
+
 .CO2 td:nth-child(3), p.CO2 {
 	background: #fc6902;
 	padding: 5px;
@@ -121,3 +133,6 @@ input[type=text] {
 	padding: 5px;
 }
 
+.subnote{
+	font-size:80%;
+}

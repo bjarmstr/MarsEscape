@@ -50,6 +50,7 @@ def login():
                     flash(hint_list[3])
                     flash(hint_list[1])
             session['failed_attempts'] = attempts
+            print("print working")
           
         else:
             answers= None
@@ -64,7 +65,8 @@ def login():
     else:
         #GET request initialize variables
         session['failed_attempts'] = 0
-        session['hint'] = 0
+        session['hint'] = 0   
+    
     return render_template('login.html', error=error)
 
 @app.route('/')
@@ -84,7 +86,9 @@ def training():
         answer = "hilite_answer"
     else:
         answer = "none"
-    return render_template('training.html', answer = answer)
+    elapsed_time = (time.time()) - (session.get('starttime'))
+    countdown = (session.get("scenario_time"))*60 - elapsed_time 
+    return render_template('training.html', answer = answer, countdown=countdown)
 
 
 @app.route('/quiz', methods=['GET', 'POST'])
@@ -97,32 +101,38 @@ def quiz():
         count = 0
         correct = {"q1":"No", "q2":"No", "q3":"No"}
         answers = request.form
-        if answers["q1"]=="q1b": 
-            correct["q1"]="True"
-            count += 1
-        if answers["q2"]=="q2d": 
-            correct["q2"]="True"
-            count += 1
-        if answers["q3"]=="q3b": 
-            correct["q3"]="True"
-            count +=1
+        if (len(answers)) == 3:
+            if answers["q1"]=="q1b": 
+                correct["q1"]="True"
+                count += 1
+            if answers["q2"]=="q2d": 
+                correct["q2"]="True"
+                count += 1
+            if answers["q3"]=="q3b": 
+                correct["q3"]="True"
+                count +=1
         print(count)
         if count == 3:
             print("training complete")
             redis_client.set("trained","True")
-            return render_template ('trained.html')
+            elapsed_time = (time.time()) - (session.get('starttime'))
+            countdown = (session.get("scenario_time"))*60 - elapsed_time 
+            return render_template ('trained.html', countdown=countdown)
         session['answers'] = answers
     page_toggle = session.get('toggle')  
     session['toggle']= True
     if page_toggle == False:
         btn_label = "submit"
     else: btn_label = "Re-review Training Material"   
+    elapsed_time = (time.time()) - (session.get('starttime'))
+    countdown = (session.get("scenario_time"))*60 - elapsed_time 
     return render_template('quiz.html', answers=answers, correct=correct,
-                           page_toggle=page_toggle, btn_label=btn_label)
+                           page_toggle=page_toggle, btn_label=btn_label,
+                           countdown=countdown)
 
-@app.route('/notavailable')
-def notavailable():
-    return render_template('notavailable.html')
+@app.route('/circuit')
+def circuit():
+    return render_template('circuit.html')
 
 @app.route('/errorcodes')
 def errorcodes():
@@ -131,6 +141,19 @@ def errorcodes():
 @app.route('/flowdiagram')
 def flowdiagram():
     return render_template('flowdiagram.html')
+
+@app.route('/startup')
+def startup():
+    return render_template('startup.html')
+
+@app.route('/tanklevels')
+def tanklevels():         
+    complete_values = op_data_from_db() #get all operations rates/levels from database           
+    elapsed_time = (time.time()) - (session.get('starttime'))
+    countdown = (session.get("scenario_time"))*60 - elapsed_time 
+    return render_template('tanklevels.html', title='tanklevels', op_valid= complete_values, 
+                          countdown=countdown)
+
 
 
 #***********Admin pages *****************
@@ -156,26 +179,32 @@ def stream():
 def scenario():
     error = None
     scenario_time = 0
+    scenario_list = {'Fuse': '5', 'Circuit': '10', 'CO2leak': '5', 'Quiz': '5'}
+    
     if request.method == 'POST':
-        
         base_time = request.form['base-time']  
         if not isInteger(base_time):
             flash('CORRECT Entry Error and RESUBMIT')
             error = " Base time must be an integer "
         is_checked = request.form 
         if error is None:
+            #scenarios default to NO
+            for key in scenario_list:
+                redis_client.hset("scenarios",key,"NO")
+            #scenarios checked set to YES
             for key, value in is_checked.items():
+                redis_client.hset("scenarios", key,key)
                 scenario_time += int(is_checked[key])        
         session['scenario_time']=scenario_time 
     
     else:
         is_checked = ""
-        base_time = 30
-        scenario_time=30
+        base_time = 40
+        scenario_time=40
         session['scenario_time']=scenario_time
         
 
-    scenario_list = {'Fuse Blows': '5', 'Control board fails': '10', 'CO2 line leak': '15', 'D': '12'}
+    
     return render_template('scenario.html', title='Scenarios', scenario_list=scenario_list,
                             is_checked = is_checked, base_time = base_time,  
                             error=error, scenario_time=scenario_time)
@@ -229,7 +258,9 @@ def operations():
             #validate form data
             if value: #was a value entered in the field?
                 print("value",value,type(value))
-                if isInteger(value):   
+                if "trained" in key:
+                    redis_client.set(key,value)
+                elif isInteger(value): 
                     if  "error" in key:
                         dict_value = {key:value}
                         redis_client.xadd(key,dict_value)

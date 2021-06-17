@@ -60,13 +60,14 @@
 		  <tr class="WPA H2O" >
 		    <td><input class="entry" type="text" name="H2O-level" value="" /></td>
 		    <td><input class="button" input type="submit" value="H2O" /></td>
-		    <td id="H2O-level"> {{(op_valid["H2O-level"])|int|round}}</td>
+		    <td id="H2O-level"> {% set h2o = op_valid["H2O-level"]|int|round %}
+		    {{h2o}}</td>
 		    <td> %</td>
 		  </tr>
 		  <tr class="CDRA CO2">
 		    <td><input class="entry" type="text" name="CO2-level" value=""/></td>
 		    <td><input class="button" input type="submit" value="CO2 " /></td>
-		    <td id="CO2-level">{{op_valid["CO2-level"]}}</td>
+		    <td id="CO2-level">{% set co2 = op_valid["CO2-level"]|int|round %}{{co2}}</td>
 		    <td> %</td>
 		  </tr>
 	
@@ -88,7 +89,7 @@
 		  </tr>
 		  <tr class="CDRA Error">
 		    <td><input class="entry" type="text" name="CDRA-error" value=""/></td>
-		    <td><input class="button" input type="submit" value="CDRA " /></td>
+		    <td><input class="button" input type="submit" value="CDRA Error" /></td>
 		    <td id="CDRA-error">{{error_code["CDRA-error"]}}</td>
 		
 		  </tr>
@@ -100,14 +101,39 @@
 		  </tr>
 		  <tr class="OGA Error">
 		    <td><input class="entry" type="text" name="OGA-error" value=""/></td>
-		    <td><input class="button" input type="submit" value="OGA " /></td>
+		    <td><input class="button" input type="submit" value="OGA Error" /></td>
 		    <td id="OGA-error">{{error_code["OGA-error"]}}</td>
 
 		  </tr>
 		
 		</table>
-		<p>**entering an error code that the unit does not recognize may result in the assembly program crashing**</p>
+
+			<p>Scenario Error Codes:<br>
+			CDRA Error 107 - Fuse <br>
+			CDRA Error 109 - Circuit <br>
+			CDRA Error 111 - CO2 Leak<br>
+			</p>
+		
+		
+		</div>
+
+				<!-- ------ Training Override -->
+	   <div class=trained>
+	   <table>
+	    <h4>Override Training Scenario </h4>
+		  <tr class=trained>
+		    <p><input type="radio" name="trained" value="True">Trained</p>
+		    <p><input type="radio" name="trained"  value="False">Not Trained</p>
+		    <p><input class="button" input type="submit" value="Override Value" /></p>
+		 
+
+		  </tr>
+		  
+		
+		</table>
+
 		</div>
 	   
  </div>
+ </form>
 {% endblock %}
